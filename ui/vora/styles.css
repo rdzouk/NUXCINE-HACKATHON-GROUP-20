@@ -1,0 +1,181 @@
+:root{
+  --bg:#0b0b0b;
+  --card:#151515;
+  --muted:#9b9b9b;
+  --accent:#00E676; /* vert néon - change si nécessaire */
+  --accent-2:#00C853;
+  --pill:#1f1f1f;
+  --glass: rgba(255,255,255,0.03);
+  --radius:20px;
+  --text:#f3f4f5;
+  font-family: 'Poppins', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+}
+
+*{box-sizing:border-box}
+html,body,#root{height:100%}
+body{
+  margin:0;
+  background:linear-gradient(180deg,#000 0%, #0a0a0a 100%);
+  color:var(--text);
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+  min-height:100vh;
+  display:flex;
+  align-items:stretch;
+  justify-content:center;
+}
+
+/* app shell */
+.app{
+  width:100%;
+  max-width:450px;
+  height:100vh;
+  position:relative;
+  overflow:hidden;
+  border-left:1px solid rgba(255,255,255,0.02);
+  border-right:1px solid rgba(255,255,255,0.02);
+}
+
+/* topbar */
+.topbar{
+  height:64px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:10px 16px;
+  backdrop-filter: blur(6px);
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
+  z-index:40;
+  position:relative;
+}
+.brand{display:flex;gap:10px;align-items:center}
+.logo{filter:drop-shadow(0 1px 4px rgba(0,230,118,0.18))}
+.brand-text{line-height:1}
+.vora{font-weight:700;letter-spacing:0.6px}
+.courses{font-size:12px;color:var(--accent);font-weight:700;margin-top:2px}
+
+.top-actions{display:flex;align-items:center;gap:12px}
+.icon-btn{background:transparent;border:0;color:var(--muted);font-size:18px}
+.avatar{width:36px;height:36px;border-radius:50%;background:linear-gradient(180deg,#222,#101010);border:2px solid rgba(255,255,255,0.04)}
+
+/* map area */
+.map-area{
+  position:relative;
+  height:56vh;
+  overflow:hidden;
+  z-index:1;
+}
+.map-bg{
+  background-image: url('https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=60');
+  /* placeholder; remplace par une vraie map */
+  background-size:cover;
+  background-position:center;
+  filter:grayscale(0.6) brightness(.55) contrast(1.05);
+  width:100%;
+  height:100%;
+  transform:scale(1.02);
+  position:absolute;
+  inset:0;
+}
+
+/* overlay content on map */
+.map-overlay{
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+}
+
+/* svg path overlay */
+.path{position:absolute;inset:0;width:100%;height:100%;opacity:0.95}
+
+/* markers */
+.marker{position:absolute;left:50%;transform:translateX(-50%);pointer-events:none}
+.marker.start{top:72%;left:20%}
+.marker.start .inner{
+  width:22px;height:22px;border-radius:50%;background:var(--accent);box-shadow:0 0 22px rgba(0,230,118,0.25);
+  display:inline-block;
+  animation: pulse 2.2s infinite;
+}
+.marker.car{top:36%;left:60%}
+.car-icon{width:44px;height:44px;border-radius:22px;background:#101010;display:flex;align-items:center;justify-content:center;border:2px solid rgba(255,255,255,0.03);box-shadow:0 6px 18px rgba(0,0,0,0.6)}
+
+/* bubbles */
+.bubble{
+  pointer-events:auto;
+  position:absolute;
+  display:inline-flex;
+  gap:8px;
+  align-items:center;
+  background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+  padding:10px 14px;
+  border-radius:999px;
+  color:var(--text);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.6);
+  border:1px solid rgba(255,255,255,0.03);
+  font-weight:600;
+  font-size:14px;
+}
+.top-bubble{top:84px;left:16px}
+.pin-bubble{top:150px;left:20%}
+.arrival-bubble{top:22px;left:14%;width:60%}
+.pin-bubble .pin{color:var(--accent);font-weight:800;font-size:20px}
+.dot.green, .small-dot.green{width:10px;height:10px;background:var(--accent-2);border-radius:50%;box-shadow:0 0 12px rgba(0,200,100,0.2)}
+.small-dot.green{width:8px;height:8px;margin-right:8px;}
+
+/* bottom sheet */
+.bottom-sheet{
+  position:fixed;
+  left:12px;
+  right:12px;
+  bottom:16px;
+  background: linear-gradient(180deg, rgba(18,18,18,0.96), rgba(14,14,14,0.98));
+  border-radius:20px;
+  padding:16px;
+  z-index:60;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.7);
+  transform: translateY(0);
+  transition: transform .32s cubic-bezier(.2,.9,.3,1);
+  max-height:48vh;
+  overflow:hidden;
+}
+
+/* sheet grabber */
+.sheet-grabber{width:54px;height:6px;background:rgba(255,255,255,0.04);border-radius:6px;margin:4px auto 12px}
+
+/* driver card */
+.driver-card{display:flex;gap:12px;align-items:flex-start}
+.avatar-lg{width:62px;height:62px;border-radius:12px;background:linear-gradient(180deg,#222,#111);border:2px solid rgba(0,0,0,0.6)}
+.driver-main{flex:1}
+.driver-name{font-size:18px;font-weight:700}
+.cert{background:rgba(0,230,118,0.12);color:var(--accent);font-weight:700;padding:4px 8px;border-radius:12px;font-size:12px;margin-left:8px}
+.rating{color:var(--muted);margin-top:6px}
+.vehicle{margin-top:12px;background:linear-gradient(180deg,rgba(255,255,255,0.01),transparent);padding:12px;border-radius:12px;display:flex;align-items:center;justify-content:space-between}
+.vehicle-info{color:var(--muted);font-size:13px}
+.plate{background:#0c0c0c;padding:8px 12px;border-radius:10px;font-weight:800;color:var(--text)}
+
+/* options list */
+.options-list{margin-top:14px;display:flex;flex-direction:column;gap:10px}
+.option{display:flex;justify-content:space-between;align-items:center;padding:12px;border-radius:14px;background:linear-gradient(180deg,#121212,#0e0e0e);border:1px solid rgba(255,255,255,0.02)}
+.option.selected{outline:2px solid rgba(0,230,118,0.12);box-shadow:0 6px 24px rgba(0,204,125,0.06);border:1px solid rgba(0,230,118,0.12)}
+.opt-title{font-weight:700}
+.opt-meta{background:#ffd966;color:#4b3b00;padding:4px 8px;border-radius:8px;font-weight:700;font-size:12px;margin-left:8px}
+
+/* floating controls */
+.floating-controls{position:fixed;left:50%;transform:translateX(-50%);bottom:110px;display:flex;gap:12px;z-index:70}
+.pill{background:var(--pill);border-radius:999px;padding:10px 14px;border:1px solid rgba(255,255,255,0.03);color:var(--text);font-weight:600;cursor:pointer}
+
+/* small details */
+.muted{color:var(--muted);font-weight:500;font-size:13px}
+
+@keyframes pulse{
+  0%{box-shadow:0 0 0 0 rgba(0,230,118,0.25)}
+  70%{box-shadow:0 0 0 18px rgba(0,230,118,0)}
+  100%{box-shadow:0 0 0 0 rgba(0,230,118,0)}
+}
+
+/* responsive small tweaks */
+@media (max-width:420px){
+  .driver-name{font-size:16px}
+  .bottom-sheet{left:8px;right:8px}
+  .map-area{height:60vh}
+}

@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Vora - Mock UI</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <!-- Top bar -->
+    <header class="topbar">
+      <div class="brand">
+        <svg class="logo" width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+          <path d="M2 12 L6 4 L12 2 L18 4 L22 12" stroke="#00E676" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </svg>
+        <div class="brand-text">
+          <div class="vora">VORA</div>
+          <div class="courses">COURSES</div>
+        </div>
+      </div>
+      <div class="top-actions">
+        <button class="icon-btn bell" aria-label="notifications">🔔</button>
+        <div class="avatar" title="Utilisateur"></div>
+      </div>
+    </header>
+
+    <!-- Map area -->
+    <main class="map-area">
+      <!-- placeholder map background -->
+      <div class="map-bg"></div>
+
+      <!-- small top bubble (traffic) -->
+      <div class="bubble top-bubble"> 
+        <span class="dot green"></span>
+        TRAFIC MODÉRÉ <span class="time">• 14 min (4,2 km)</span>
+      </div>
+
+      <!-- pin on map -->
+      <div class="map-overlay">
+        <svg class="path" viewBox="0 0 200 200" preserveAspectRatio="none" aria-hidden>
+          <path d="M10 190 C60 130, 140 80, 190 10" stroke="#00E676" stroke-width="4" stroke-linecap="round" stroke-dasharray="6 6" fill="none" opacity="0.95"/>
+        </svg>
+
+        <div class="marker start">
+          <div class="inner"></div>
+        </div>
+
+        <div class="marker car">
+          <div class="car-icon">🚗</div>
+        </div>
+
+        <div class="bubble pin-bubble">
+          <div class="pin-left">
+            <div class="small-dot green"></div>
+            <div>Code PIN : <span class="pin">4821</span></div>
+          </div>
+        </div>
+
+        <div class="bubble arrival-bubble">
+          <div class="arr-text">
+            <div class="large">Arrivée dans <strong>3</strong> min</div>
+            <div class="sub">• 850 m • Akwa Nord</div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- overlay controls (Télécharger / Code / Gallery) -->
+    <div class="floating-controls">
+      <button class="pill">⤓ Télécharger</button>
+      <button class="pill">{"</>"} Code</button>
+      <button class="pill">◻ Gallery</button>
+    </div>
+
+    <!-- bottom sheet -->
+    <div class="bottom-sheet" id="sheet">
+      <div class="sheet-grabber"></div>
+
+      <div class="driver-card">
+        <div class="driver-left">
+          <div class="avatar-lg"></div>
+        </div>
+        <div class="driver-main">
+          <div class="driver-name">Samuel E. <span class="cert">Certifié</span></div>
+          <div class="rating">★ 4.9 <span class="muted">(620+ courses)</span></div>
+
+          <div class="vehicle">
+            <div class="vehicle-info">Toyota Yaris (2021) • Gris Métallisé • Climatisation active</div>
+            <div class="plate">LT 492 BX</div>
+          </div>
+        </div>
+        <div class="driver-right">
+          <div class="car-thumb"></div>
+        </div>
+      </div>
+
+      <div class="options-list">
+        <div class="option selected">
+          <div class="opt-left">🚗 <div class="opt-title">Vora Go <span class="opt-meta">5 min • Populaire</span></div></div>
+          <div class="opt-right">1800 FCFA</div>
+        </div>
+
+        <div class="option">
+          <div class="opt-left">🏍️ <div class="opt-title">VoraMoto <span class="opt-meta">3 min</span></div></div>
+          <div class="opt-right">600 FCFA</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
