@@ -1,0 +1,35 @@
+# Development overlay. Opt in explicitly:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+#
+# Deliberately not named docker-compose.override.yml, which Compose would load
+# automatically and silently: mounting source over the image and enabling
+# --reload in what someone thought was a production run is the kind of surprise
+# that is only discovered live.
+
+services:
+  api:
+    volumes:
+      - ./app:/srv/app:ro
+      - ./migrations:/srv/migrations:ro
+    command:
+      - uvicorn
+      - app.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --reload
+      - --proxy-headers
+      - --forwarded-allow-ips
+      - "*"
+
+  postgres:
+    # Exposed on loopback so psql from the host can inspect the database
+    # during development. Absent from the base file on purpose.
+    ports:
+      - "127.0.0.1:5432:5432"
+
+  redis:
+    ports:
+      - "127.0.0.1:6379:6379"

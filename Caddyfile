@@ -1,0 +1,39 @@
+# Caddy fronts the API on both deployment paths.
+#
+#   Cloudflare Tunnel (current): TLS terminates at Cloudflare's edge and
+#   cloudflared connects to this server on plain HTTP over the internal
+#   network. CADDY_SITE_ADDRESS defaults to ":80" in docker-compose.yml, so the
+#   site binds port 80 and Caddy does not attempt ACME.
+#
+#   VPS with a public A record: set CADDY_SITE_ADDRESS to the hostname and
+#   Caddy provisions a certificate itself. No other change is needed.
+#
+# The default lives in Compose rather than here as "{$VAR:default}", because
+# Caddy applies that default only when the variable is unset, and Compose sets
+# it to an empty string. An empty site address makes this a keyless block,
+# which Caddy reads as a second global-options block and refuses to start.
+
+{
+	# The admin API is a full control plane on localhost:2019. Nothing in this
+	# stack uses it, so it does not run.
+	admin off
+	persist_config off
+}
+
+{$CADDY_SITE_ADDRESS} {
+	encode zstd gzip
+
+	# Caddy sets X-Forwarded-For, X-Forwarded-Proto and X-Forwarded-Host on the
+	# upstream request. uvicorn runs with --proxy-headers so the app sees the
+	# real scheme and client IP, which the per-IP rate limiter in Phase 1 needs.
+	reverse_proxy api:8000 {
+		health_uri /api/v1/health
+		health_interval 15s
+		health_timeout 5s
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}

@@ -1,0 +1,33 @@
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S", "ASYNC", "C4", "SIM", "RUF"]
+ignore = [
+    "E501",    # line length is handled by the formatter
+    "B008",    # FastAPI dependencies are function calls in defaults by design
+    "S104",    # binding 0.0.0.0 inside a container is correct
+]
+
+[tool.ruff.lint.per-file-ignores]
+# S105 flags any string constant whose name contains TOKEN, SECRET or PASSWORD.
+# In these three files those names are error-code identifiers and the literal
+# "Bearer", not credentials. Real secrets live in app/config.py as SecretStr
+# with no defaults, where S105 stays enabled.
+"app/errors/codes.py" = ["S105"]
+"app/schemas/auth.py" = ["S105"]
+# S105 fires on _TOKEN_BUCKET_LUA because the name contains "TOKEN". It is a
+# Lua script. The noqa cannot go inline without landing inside the string.
+"app/services/rate_limit.py" = ["S105"]
+"tests/*" = ["S101", "S105"]     # assert is the point of a test
+# S608 in the smoke scripts: they drive `psql -c`, which takes no bind
+# parameters, so statements are built as strings. Every interpolated value is a
+# server-generated UUID parsed by uid() first, so the input is constrained even
+# though the query cannot be parameterised. Application code has S608 enabled.
+"scripts/*" = ["S603", "S607", "S608"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "-q --strict-markers"

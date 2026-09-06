@@ -1,0 +1,141 @@
+# VORA stack. One command from a cold machine to a reachable HTTPS API.
+#
+# Port exposure: only Caddy and the API bind to the host, and the API only so
+# that a developer can curl it directly. Postgres and Redis are reachable on
+# the internal network and nowhere else. A Postgres exposed on 5432 with a
+# hackathon password is how a demo box becomes someone else's.
+
+name: vora
+
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-vora}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-vora}
+      # Slightly stricter than the image default; this database holds location
+      # traces and KYC references.
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-vora} -d ${POSTGRES_DB:-vora}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks: [vora_internal]
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: >
+      redis-server
+      --save 60 1
+      --appendonly no
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [vora_internal]
+
+  osrm:
+    # Enabled from Phase 2, once the Yaounde/Douala extract has been prepared
+    # by docker/osrm/prepare.sh. Until then the API reports osrm as
+    # not_configured rather than pretending routing works.
+    profiles: ["routing"]
+    image: osrm/osrm-backend:latest
+    restart: unless-stopped
+    command: osrm-routed --algorithm mld --max-matching-size 2000 /data/region.osrm
+    volumes:
+      - ./osrm-data:/data:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- 'http://127.0.0.1:5000/route/v1/driving/11.5021,3.8480;11.5100,3.8550?overview=false' | grep -q '\"code\":\"Ok\"'"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks: [vora_internal]
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      POSTGRES_HOST: postgres
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    ports:
+      # Loopback only. The public path is Caddy, then the tunnel; this exists so
+      # a developer can curl the API directly. Configurable because 8000 is a
+      # popular port and colliding with something already on the host should not
+      # require editing this file.
+      - "127.0.0.1:${API_HOST_PORT:-8000}:8000"
+    networks: [vora_internal]
+
+  caddy:
+    # Config is baked into the image, not bind-mounted. See docker/caddy.Dockerfile.
+    # Changing the Caddyfile needs: docker compose up -d --build caddy
+    build:
+      context: .
+      dockerfile: docker/caddy.Dockerfile
+    restart: unless-stopped
+    environment:
+      # ":80" behind a tunnel; set to a hostname on a VPS and Caddy does ACME.
+      CADDY_SITE_ADDRESS: ${CADDY_SITE_ADDRESS:-:80}
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [api]
+    ports:
+      # Bound for the VPS path. Harmless behind a tunnel, which reaches Caddy
+      # over the internal network rather than through these.
+      - "80:80"
+      - "443:443"
+    networks: [vora_internal]
+
+  cloudflared:
+    # Real TLS on a real public hostname without a VPS or a DNS wait.
+    # With CLOUDFLARE_TUNNEL_TOKEN set, runs the named tunnel configured in the
+    # Zero Trust dashboard. Without it, runs a quick tunnel and prints a
+    # generated trycloudflare.com hostname to its logs.
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    # This image is distroless (no shell) and its entrypoint is already
+    # ["cloudflared", "--no-autoupdate"], so `command` is arguments only and
+    # cannot branch. Switch modes with the environment instead:
+    #
+    #   quick tunnel (default)  nothing to set; a trycloudflare.com hostname
+    #                           is generated and printed to this service's logs
+    #   named tunnel            set CLOUDFLARE_TUNNEL_TOKEN in .env and
+    #                           CLOUDFLARE_TUNNEL_ARGS="tunnel run"
+    #
+    # cloudflared reads the token from TUNNEL_TOKEN, so it travels in the
+    # environment and never in argv, where `docker ps` and the host process
+    # list would expose it.
+    command: ${CLOUDFLARE_TUNNEL_ARGS:-tunnel --url http://caddy:80}
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    depends_on: [caddy]
+    networks: [vora_internal]
+
+networks:
+  vora_internal:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  caddy_data:
+  caddy_config:
