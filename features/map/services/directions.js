@@ -1,16 +1,27 @@
-export async function getRoute(origin, destination) {
-  const token = import.meta.env.VITE_MAPBOX_TOKEN;
-  const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${origin.lng},${origin.lat};${destination.lng},${destination.lat}?geometries=geojson&access_token=${token}`;
+import { apiFetch } from './apiClient';
+import { decodePolyline } from '../utils/polyline';
 
-  const res = await fetch(url);
-  if (!res.ok) throw new Error('Directions request failed');
-  const data = await res.json();
-  const route = data.routes?.[0];
-  if (!route) throw new Error('No route found');
+// Replaces Mapbox Directions. Fare is computed server-side here — never
+// trust or recompute a price on the client (contract invariant I2).
+export async function getQuote(pickup, dropoff, seats = 1, mode = 'exclusive') {
+  const data = await apiFetch('/rides/quote', {
+    method: 'POST',
+    body: JSON.stringify({
+      pickup: { lat: pickup.lat, lng: pickup.lng, label: pickup.name },
+      dropoff: { lat: dropoff.lat, lng: dropoff.lng, label: dropoff.name },
+      seats,
+      mode,
+    }),
+  });
 
   return {
-    geometry: route.geometry,       // GeoJSON for RouteLayer
-    distanceKm: route.distance / 1000,
-    durationMin: route.duration / 60,
+    quoteId: data.quote_id,
+    geometry: decodePolyline(data.route_polyline),
+    distanceKm: data.distance_m / 1000,
+    durationMin: data.duration_s / 60,
+    fareXaf: data.fare_xaf,
+    corridorFareXaf: data.corridor_fare_xaf ?? null,
+    expiresAt: data.expires_at,
+    breakdown: data.breakdown,
   };
 }

@@ -1,27 +1,26 @@
 import { useState, useCallback } from 'react';
-import { getRoute } from '../services/directions';
-import { haversineKm } from '../utils/distance';
+import { getQuote } from '../services/directions';
 
 export function useRoute() {
-  const [route, setRoute] = useState(null);
+  const [quote, setQuote] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const fetchRoute = useCallback(async (origin, destination) => {
+  const fetchQuote = useCallback(async (origin, destination, seats = 1, mode = 'exclusive') => {
     setLoading(true);
     setError(null);
     try {
-      const result = await getRoute(origin, destination);
-      setRoute(result);
+      const result = await getQuote(origin, destination, seats, mode);
+      setQuote(result);
     } catch (err) {
+      // No client-side fallback price here — a failed quote must not be
+      // guessed at (I2). Show the error, let the user retry.
       setError(err.message);
-      // fallback: straight-line distance, rough duration estimate
-      const distanceKm = haversineKm(origin, destination);
-      setRoute({ geometry: null, distanceKm, durationMin: distanceKm * 2 });
+      setQuote(null);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  return { route, loading, error, fetchRoute };
+  return { quote, loading, error, fetchQuote };
 }
