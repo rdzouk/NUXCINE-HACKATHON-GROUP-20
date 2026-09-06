@@ -88,6 +88,27 @@ button, input, textarea {
   width: 100%;
 }
 
+.notification-bell {
+  position: relative;
+  color: var(--color-text);
+  text-decoration: none;
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
+.notification-badge {
+  position: absolute;
+  top: -7px;
+  right: -9px;
+  min-width: 18px;
+  padding: 2px 5px;
+  border-radius: 999px;
+  background: var(--color-danger);
+  color: #fff;
+  text-align: center;
+  font: 700 0.65rem var(--font-ui);
+}
+
 .eyebrow {
   margin: 0 0 4px;
   color: var(--color-accent);
@@ -330,3 +351,8 @@ button, input, textarea {
     overflow-x: auto;
   }
 }
+
+.legal-page h3 { margin-top: 24px; margin-bottom: 8px; }
+.legal-page p { line-height: 1.6; max-width: 65ch; }
+.legal-links { display: flex; flex-wrap: wrap; gap: 12px; }
+.legal-links a { color: var(--color-primary); font: 600 0.9rem var(--font-ui); }

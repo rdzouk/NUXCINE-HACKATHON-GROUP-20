@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useMockAuth } from '../../../app/MockAuthContext';
 import BottomNav from '../components/BottomNav';
+import NotificationBell from '../../shared/components/NotificationBell';
 
 export default function HomePage() {
   const { user } = useMockAuth();
@@ -12,6 +13,7 @@ export default function HomePage() {
           <p className="eyebrow">Bonjour, {user.name}</p>
           <h1>Where are you going?</h1>
         </div>
+        <NotificationBell />
       </header>
 
       <Link to="/passenger/book" className="search-bar-button">

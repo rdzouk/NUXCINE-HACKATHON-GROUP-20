@@ -1,10 +1,12 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { MockAuthProvider } from './app/MockAuthContext';
+import { NotificationProvider } from './app/NotificationContext';
 import DevIndex from './app/DevIndex';
 
 import SplashPage from './features/auth/pages/SplashPage';
 import LoginPage from './features/auth/pages/LoginPage';
 import SignupPage from './features/auth/pages/SignupPage';
+import DriverEnRoutePage from './features/passenger/pages/DriverEnRoutePage';
 
 import HomePage from './features/passenger/pages/HomePage';
 import MapBookingPage from './features/passenger/pages/MapBookingPage';
@@ -15,6 +17,9 @@ import RideCompletedPage from './features/passenger/pages/RideCompletedPage';
 import PassengerHistoryPage from './features/passenger/pages/HistoryPage';
 import PassengerProfilePage from './features/passenger/pages/ProfilePage';
 import SupportPage from './features/passenger/pages/SupportPage';
+import NotificationsPage from './features/shared/pages/NotificationsPage';
+import PrivacyPolicyPage from './features/legal/pages/PrivacyPolicyPage';
+import TermsPage from './features/legal/pages/TermsPage';
 
 import DriverDashboardPage from './features/driver/pages/DashboardPage';
 import IncomingRequestPage from './features/driver/pages/IncomingRequestPage';
@@ -37,8 +42,9 @@ import ReportsPage from './features/admin/pages/ReportsPage';
 export default function App() {
   return (
     <MockAuthProvider>
-      <BrowserRouter>
-        <Routes>
+      <NotificationProvider>
+        <BrowserRouter>
+          <Routes>
           <Route path="/" element={<DevIndex />} />
 
           <Route path="/splash" element={<SplashPage />} />
@@ -48,6 +54,7 @@ export default function App() {
           <Route path="/passenger/home" element={<HomePage />} />
           <Route path="/passenger/book" element={<MapBookingPage />} />
           <Route path="/passenger/confirm" element={<ConfirmRidePage />} />
+          <Route path="/passenger/driver-enroute" element={<DriverEnRoutePage />} />
           <Route path="/passenger/searching" element={<SearchingDriverPage />} />
           <Route path="/passenger/ride" element={<PassengerRideInProgressPage />} />
           <Route path="/passenger/completed" element={<RideCompletedPage />} />
@@ -71,9 +78,13 @@ export default function App() {
           <Route path="/admin/drivers" element={<DriversPage />} />
           <Route path="/admin/rides" element={<RidesPage />} />
           <Route path="/admin/stats" element={<StatsPage />} />
-          <Route path="/admin/reports" element={<ReportsPage />} />
-        </Routes>
-      </BrowserRouter>
+            <Route path="/admin/reports" element={<ReportsPage />} />
+            <Route path="/notifications" element={<NotificationsPage />} />
+            <Route path="/legal/privacy" element={<PrivacyPolicyPage />} />
+            <Route path="/legal/terms" element={<TermsPage />} />
+          </Routes>
+        </BrowserRouter>
+      </NotificationProvider>
     </MockAuthProvider>
   );
 }

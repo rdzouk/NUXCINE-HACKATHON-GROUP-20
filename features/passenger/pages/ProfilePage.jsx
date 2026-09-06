@@ -1,4 +1,5 @@
 import { useMockAuth } from '../../../app/MockAuthContext';
+import { Link } from 'react-router-dom';
 import BottomNav from '../components/BottomNav';
 
 export default function ProfilePage() {
@@ -12,6 +13,8 @@ export default function ProfilePage() {
       <p><strong>Rating:</strong> ⭐ {user.rating}</p>
       <button className="secondary-button">Edit profile</button>
       <button className="secondary-button">Log out</button>
+      <Link className="secondary-button" to="/legal/privacy">Privacy Policy</Link>
+      <Link className="secondary-button" to="/legal/terms">Terms &amp; Conditions</Link>
       <BottomNav />
     </main>
   );

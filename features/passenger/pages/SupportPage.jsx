@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom';
+
 export default function SupportPage() {
   return (
     <main className="app-shell">
@@ -9,6 +11,10 @@ export default function SupportPage() {
       </ul>
       <textarea placeholder="Describe your issue..." rows={4} />
       <button className="primary-button">Send</button>
+      <div className="legal-links">
+        <Link to="/legal/privacy">Privacy Policy</Link>
+        <Link to="/legal/terms">Terms &amp; Conditions</Link>
+      </div>
     </main>
   );
 }

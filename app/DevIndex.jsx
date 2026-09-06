@@ -4,9 +4,11 @@ const links = [
   { section: 'Auth', pages: [['Splash', '/splash'], ['Login', '/login'], ['Signup', '/signup']] },
   { section: 'Passenger', pages: [
     ['Home', '/passenger/home'], ['Book a ride', '/passenger/book'], ['Confirm', '/passenger/confirm'],
-    ['Searching driver', '/passenger/searching'], ['Ride in progress', '/passenger/ride'],
+    ['Searching driver', '/passenger/searching'], ['Driver en route', '/passenger/driver-enroute'],
+    ['Ride in progress', '/passenger/ride'],
     ['Ride completed', '/passenger/completed'], ['History', '/passenger/history'],
-    ['Profile', '/passenger/profile'], ['Support', '/passenger/support'],
+    ['Profile', '/passenger/profile'], ['Support', '/passenger/support'], ['Notifications', '/notifications'],
+    ['Privacy policy', '/legal/privacy'], ['Terms', '/legal/terms'],
   ]},
   { section: 'Driver', pages: [
     ['Dashboard', '/driver/dashboard'], ['Incoming request', '/driver/request'],

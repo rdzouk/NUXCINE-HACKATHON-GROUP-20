@@ -9,7 +9,7 @@ export default function SearchingDriverPage() {
       <h2>Looking for a driver...</h2>
       <p>This won't take long.</p>
       {/* Stub button — real flow auto-advances when a driver accepts */}
-      <button className="secondary-button" onClick={() => navigate('/passenger/ride')}>
+      <button className="secondary-button" onClick={() => navigate('/passenger/driver-enroute')}>
         (Dev) Simulate driver found
       </button>
     </main>
