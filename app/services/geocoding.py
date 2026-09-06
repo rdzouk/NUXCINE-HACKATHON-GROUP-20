@@ -125,9 +125,7 @@ fuzzy AS (
     SELECT l.*, 2 AS layer_rank,
            GREATEST(
                similarity(vora_unaccent(lower(l.name)), q.folded),
-               similarity(
-                   vora_unaccent(lower(array_to_string(l.aliases, ' '))), q.folded
-               ),
+               similarity(vora_alias_text(l.aliases), q.folded),
                CASE WHEN l.search_vec @@ q.tsq
                     THEN 0.5 + ts_rank(l.search_vec, q.tsq)
                     ELSE 0 END
@@ -139,7 +137,7 @@ fuzzy AS (
       AND (
             l.search_vec @@ q.tsq
          OR vora_unaccent(lower(l.name)) % q.folded
-         OR vora_unaccent(lower(array_to_string(l.aliases, ' '))) % q.folded
+         OR vora_alias_text(l.aliases) % q.folded
          OR vora_unaccent(lower(l.name)) LIKE '%' || q.folded || '%'
       )
 ),
@@ -282,10 +280,9 @@ async def reverse_geocode(
         matched_alias=row.name,
     )
 
+    # Within about a block, naming the landmark is the whole answer. Beyond
+    # that, the distance is what makes the label usable to a driver.
     distance = int(row.distance_m)
-    if distance <= 120:
-        label = row.name
-    else:
-        label = f"{distance} m de {row.name}"
+    label = row.name if distance <= 120 else f"{distance} m de {row.name}"
 
     return place, label

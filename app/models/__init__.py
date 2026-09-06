@@ -7,6 +7,7 @@ generated migration then proposes dropping its table.
 """
 
 from app.models.base import Base, TimestampMixin, UuidPkMixin
+from app.models.geo import DriverPresence, Landmark
 from app.models.user import (
     Driver,
     KycDocument,
@@ -19,7 +20,9 @@ from app.models.user import (
 __all__ = [
     "Base",
     "Driver",
+    "DriverPresence",
     "KycDocument",
+    "Landmark",
     "OtpChallenge",
     "RefreshToken",
     "TimestampMixin",

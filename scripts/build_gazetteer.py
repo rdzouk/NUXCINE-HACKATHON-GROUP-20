@@ -237,24 +237,20 @@ class LandmarkCollector(osmium.SimpleHandler):
         self.seen_names[kind] += 1
 
     def node(self, n) -> None:
+        # Nodes only, and deliberately so.
+        #
+        # Handling ways and areas as well would need a node-location index for
+        # the whole country, which on this 5 GB box climbed past 3 GB and was
+        # still running after several minutes. Nodes carry their own
+        # coordinates, so this pass needs no index and finishes in seconds.
+        #
+        # What that costs: a place mapped only as a building polygon and not
+        # as a point is missed. In practice OSM contributors tag Cameroonian
+        # POIs overwhelmingly as nodes, and the categories that matter most
+        # here (carrefours, fuel stations, markets, quartiers) are nodes by
+        # convention. The gap is covered by the curated supplement.
         if n.location.valid():
             self._consider(n, n.location.lat, n.location.lon, "node")
-
-    def area(self, a) -> None:
-        try:
-            centroid = a.inner_rings  # touch to ensure geometry is materialised
-        except Exception:  # noqa: BLE001
-            centroid = None
-        del centroid
-        try:
-            # osmium exposes no centroid directly; use the bounding-box centre,
-            # which is accurate enough for a landmark people navigate toward.
-            envelope = a.envelope()
-            lat = (envelope.bottom_left.lat + envelope.top_right.lat) / 2
-            lng = (envelope.bottom_left.lon + envelope.top_right.lon) / 2
-        except Exception:  # noqa: BLE001 - malformed geometry is common in OSM
-            return
-        self._consider(a, lat, lng, "area")
 
 
 def main() -> int:
@@ -278,7 +274,9 @@ def main() -> int:
 
     print(f"reading {pbf} ({pbf.stat().st_size / 1e6:.0f} MB)")
     collector = LandmarkCollector()
-    collector.apply_file(str(pbf), locations=True, idx="flex_mem")
+    # No `locations=True`: nodes carry their own coordinates, and building the
+    # country-wide location index is what made the earlier attempt exhaust memory.
+    collector.apply_file(str(pbf))
 
     records = sorted(
         collector.records.values(), key=lambda r: (-r["popularity"], r["name"])

@@ -44,6 +44,10 @@ WORKDIR /srv
 COPY --chown=vora:vora alembic.ini ./
 COPY --chown=vora:vora migrations ./migrations
 COPY --chown=vora:vora app ./app
+# Seeding and the operational scripts run inside the container, because
+# Postgres is deliberately not published to the host.
+COPY --chown=vora:vora scripts ./scripts
+COPY --chown=vora:vora data ./data
 
 USER vora
 

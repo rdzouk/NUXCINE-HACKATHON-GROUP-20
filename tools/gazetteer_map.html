@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VORA gazetteer</title>
+<!--
+  Testing tool, not product.
+
+  Types a query against /places/search and shows what resolves and which layer
+  of the cascade produced it. The point is to see the geocoder being wrong: a
+  hit rate on its own tells you the number but not which kinds of query fail,
+  and this makes that obvious in a way a test run does not.
+
+  Single file, no build step, no dependency beyond Leaflet from a CDN.
+-->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  :root {
+    --ground: #14161a;
+    --ink: #e8e6e3;
+    --muted: #8b9099;
+    --line: #262a31;
+    --accent: #4a9eff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--ground);
+    color: var(--ink);
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+  }
+  #panel {
+    width: 380px;
+    flex: none;
+    padding: 22px;
+    overflow-y: auto;
+    border-right: 1px solid var(--line);
+  }
+  #map { flex: 1; }
+
+  h1 { font-size: 15px; font-weight: 600; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 20px; font-size: 13px; }
+
+  label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+  input[type=text] {
+    width: 100%;
+    padding: 9px 11px;
+    background: #1b1e24;
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    color: var(--ink);
+    font: inherit;
+  }
+  input[type=text]:focus { outline: none; border-color: var(--accent); }
+
+  .row { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+  .row label { margin: 0; }
+
+  h2 {
+    font-size: 13px; font-weight: 600; margin: 20px 0 8px;
+    padding-bottom: 8px; border-bottom: 1px solid var(--line);
+  }
+
+  .result {
+    padding: 8px 0;
+    border-bottom: 1px solid var(--line);
+    cursor: pointer;
+  }
+  .result:hover .name { color: var(--accent); }
+  .name { font-weight: 500; }
+  .meta { color: var(--muted); font-size: 12px; margin-top: 2px; }
+
+  /* Provenance stays semantic: confidence descends, and the colour descends
+     with it. Not restyled to match the palette. */
+  .layer { font-size: 11px; font-weight: 600; }
+  .exact_alias    { color: #4ade80; }
+  .fuzzy_landmark { color: #facc15; }
+  .quartier       { color: #fb923c; }
+  .street_fallback{ color: #f87171; }
+
+  .empty { color: var(--muted); padding: 12px 0; }
+  .stat { color: var(--muted); font-size: 12px; margin-top: 12px; }
+  .leaflet-popup-content { font: 13px system-ui, sans-serif; }
+</style>
+</head>
+<body>
+
+<div id="panel">
+  <h1>Gazetteer</h1>
+  <p class="sub">Type a place the way somebody would say it.</p>
+
+  <label for="q">Query</label>
+  <input type="text" id="q" placeholder="carefour warda" autocomplete="off" autofocus>
+
+  <div class="row">
+    <input type="checkbox" id="bias">
+    <label for="bias">Bias to map centre</label>
+  </div>
+
+  <h2>Results</h2>
+  <div id="results"><div class="empty">Nothing yet.</div></div>
+  <div class="stat" id="stat"></div>
+</div>
+
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// Same origin when served by the API; override for a remote deployment.
+const API = new URLSearchParams(location.search).get('api')
+         || 'http://localhost:8080/api/v1';
+
+const map = L.map('map').setView([3.8480, 11.5021], 13);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; OpenStreetMap',
+  maxZoom: 19,
+}).addTo(map);
+
+let markers = [];
+
+function clearMarkers() {
+  markers.forEach(m => map.removeLayer(m));
+  markers = [];
+}
+
+function render(payload, elapsed) {
+  const box = document.getElementById('results');
+  clearMarkers();
+
+  const results = payload.results || [];
+  if (!results.length) {
+    box.innerHTML = '<div class="empty">No match. The client would offer a map pin here.</div>';
+    document.getElementById('stat').textContent =
+      `0 results in ${elapsed} ms (street_fallback)`;
+    return;
+  }
+
+  box.innerHTML = '';
+  const bounds = [];
+
+  results.forEach((r, i) => {
+    const el = document.createElement('div');
+    el.className = 'result';
+    el.innerHTML = `
+      <div class="name">${i + 1}. ${escapeHtml(r.name)}</div>
+      <div class="meta">
+        <span class="layer ${r.match_type}">${r.match_type}</span>
+        &middot; ${escapeHtml(r.kind)}
+        ${r.quartier ? '&middot; ' + escapeHtml(r.quartier) : ''}
+        ${r.distance_m != null ? '&middot; ' + r.distance_m + ' m' : ''}
+      </div>`;
+
+    const marker = L.marker([r.lat, r.lng]).addTo(map)
+      .bindPopup(`<b>${escapeHtml(r.name)}</b><br>${escapeHtml(r.match_type)}`);
+    markers.push(marker);
+    bounds.push([r.lat, r.lng]);
+
+    el.onclick = () => { map.setView([r.lat, r.lng], 16); marker.openPopup(); };
+    box.appendChild(el);
+  });
+
+  if (bounds.length) map.fitBounds(bounds, {padding: [60, 60], maxZoom: 16});
+
+  const layers = {};
+  results.forEach(r => layers[r.match_type] = (layers[r.match_type] || 0) + 1);
+  document.getElementById('stat').textContent =
+    `${results.length} results in ${elapsed} ms · ` +
+    Object.entries(layers).map(([k, v]) => `${k}: ${v}`).join(', ');
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => (
+    {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]
+  ));
+}
+
+let timer = null;
+async function search() {
+  const q = document.getElementById('q').value.trim();
+  if (!q) {
+    document.getElementById('results').innerHTML = '<div class="empty">Nothing yet.</div>';
+    document.getElementById('stat').textContent = '';
+    clearMarkers();
+    return;
+  }
+
+  const params = new URLSearchParams({q, limit: '8'});
+  if (document.getElementById('bias').checked) {
+    const c = map.getCenter();
+    params.set('near', `${c.lat.toFixed(5)},${c.lng.toFixed(5)}`);
+  }
+
+  const started = performance.now();
+  try {
+    const response = await fetch(`${API}/places/search?${params}`);
+    const elapsed = Math.round(performance.now() - started);
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      document.getElementById('results').innerHTML =
+        `<div class="empty">${escapeHtml(body?.error?.code || response.status)}</div>`;
+      return;
+    }
+    render(await response.json(), elapsed);
+  } catch (err) {
+    document.getElementById('results').innerHTML =
+      `<div class="empty">Request failed: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+// Debounced, so typing does not fire a query per keystroke.
+document.getElementById('q').addEventListener('input', () => {
+  clearTimeout(timer);
+  timer = setTimeout(search, 220);
+});
+document.getElementById('bias').addEventListener('change', search);
+</script>
+</body>
+</html>

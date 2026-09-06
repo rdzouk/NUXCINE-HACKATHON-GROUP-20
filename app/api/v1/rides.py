@@ -14,7 +14,6 @@ from uuid import UUID
 from fastapi import APIRouter, Header, Query, status
 
 from app.api.v1._stub import COMMON_ERRORS, not_implemented
-from app.schemas.quote import QuoteRequest, QuoteResponse
 from app.schemas.ride import (
     IncidentReportRequest,
     IncidentResponse,
@@ -32,21 +31,6 @@ from app.schemas.ride import (
 )
 
 router = APIRouter(tags=["rides"])
-
-
-@router.post(
-    "/rides/quote",
-    response_model=QuoteResponse,
-    responses=COMMON_ERRORS,
-    summary="Price a trip",
-    description=(
-        "Returns a signed, five-minute quote covering both exclusive and "
-        "corridor pricing. The fare is re-derived server-side at ride creation; "
-        "a client-supplied price is never an input (I2)."
-    ),
-)
-async def quote_ride(payload: QuoteRequest) -> QuoteResponse:
-    not_implemented("Phase 2")
 
 
 @router.post(

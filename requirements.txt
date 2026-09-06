@@ -25,3 +25,15 @@ argon2-cffi>=23.1
 phonenumbers>=8.13
 # AES-GCM for KYC fields at rest. Not for passwords; argon2 does that.
 cryptography>=43.0
+
+# Phase 2 geo and routing.
+# PostGIS column types for SQLAlchemy. Spatial DDL is still written by hand in
+# the migrations; this is for the models and queries.
+geoalchemy2>=0.15
+# Corridor containment geometry (Phase 6). Declared here because it is part of
+# the agreed Phase 2 stack.
+shapely>=2.0
+# Polyline encode/decode. Used rather than hand-rolled: the format has enough
+# sign and chunking detail to get subtly wrong, and a wrong polyline draws a
+# route through the Gulf of Guinea.
+polyline>=2.0

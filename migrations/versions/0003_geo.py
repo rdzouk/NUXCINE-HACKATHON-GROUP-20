@@ -54,6 +54,29 @@ def upgrade() -> None:
         """
     )
 
+    # Folded alias text, for the trigram index.
+    #
+    # `array_to_string` is STABLE rather than IMMUTABLE, so using it directly
+    # in an index expression is rejected. The STABLE marking is a blanket
+    # conservatism across every array type: for some element types the output
+    # function is affected by run-time settings (DateStyle, for instance).
+    #
+    # Restricted to `text[]`, that concern does not apply. The output function
+    # for text is the identity, so this is genuinely deterministic and the
+    # IMMUTABLE claim is true rather than a convenient lie to the planner.
+    # The signature is deliberately typed `text[]` and not `anyarray`, because
+    # `anyarray` is exactly the case where the claim would be false.
+    op.execute(
+        """
+        CREATE OR REPLACE FUNCTION vora_alias_text(text[])
+        RETURNS text
+        LANGUAGE sql
+        IMMUTABLE
+        PARALLEL SAFE
+        AS $$ SELECT vora_unaccent(lower(array_to_string($1, ' '))) $$;
+        """
+    )
+
     op.execute(
         "CREATE TYPE landmark_kind AS ENUM ('carrefour', 'station', 'market', "
         "'school', 'hospital', 'admin', 'business', 'quartier')"
@@ -161,8 +184,8 @@ def upgrade() -> None:
         "USING gin (vora_unaccent(lower(name)) gin_trgm_ops)"
     )
     op.execute(
-        "CREATE INDEX ix_landmarks_alias_trgm ON landmarks USING gin ("
-        "vora_unaccent(lower(array_to_string(aliases, ' '))) gin_trgm_ops)"
+        "CREATE INDEX ix_landmarks_alias_trgm ON landmarks "
+        "USING gin (vora_alias_text(aliases) gin_trgm_ops)"
     )
 
     op.create_table(
@@ -214,4 +237,5 @@ def downgrade() -> None:
     op.execute("DROP FUNCTION IF EXISTS landmarks_search_vec_refresh()")
     op.drop_table("landmarks")
     op.execute("DROP TYPE IF EXISTS landmark_kind")
+    op.execute("DROP FUNCTION IF EXISTS vora_alias_text(text[])")
     op.execute("DROP FUNCTION IF EXISTS vora_unaccent(text)")

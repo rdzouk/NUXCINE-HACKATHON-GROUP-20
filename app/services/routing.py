@@ -24,6 +24,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 import httpx
+import polyline
 
 from app.config import settings
 from app.logging import get_logger
@@ -65,25 +66,12 @@ def haversine_m(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
 def encode_polyline(points: list[tuple[float, float]], precision: int = 5) -> str:
     """Encode (lat, lng) pairs as a Google-format polyline.
 
-    Written out rather than pulled from a library because the fallback needs to
-    emit a two-point line and nothing else, and the client already decodes this
-    format for OSRM's output. One format on the wire, whatever the source.
+    The fallback emits the same wire format OSRM does, so the client decodes
+    one thing regardless of which produced the route. Precision 5 matches
+    OSRM's default; encoding at 6 and decoding at 5 misplaces the line by
+    roughly a factor of ten, which is the classic version of this bug.
     """
-    factor = 10**precision
-    out: list[str] = []
-    prev_lat = prev_lng = 0
-
-    for lat, lng in points:
-        ilat, ilng = round(lat * factor), round(lng * factor)
-        for delta in (ilat - prev_lat, ilng - prev_lng):
-            value = ~(delta << 1) if delta < 0 else (delta << 1)
-            while value >= 0x20:
-                out.append(chr((0x20 | (value & 0x1F)) + 63))
-                value >>= 5
-            out.append(chr(value + 63))
-        prev_lat, prev_lng = ilat, ilng
-
-    return "".join(out)
+    return polyline.encode(points, precision)
 
 
 class RoutingProvider(ABC):
@@ -112,8 +100,8 @@ class HaversineFallbackProvider(RoutingProvider):
         distance = straight * HAVERSINE_ROAD_FACTOR
         duration = (distance / 1000.0) / FALLBACK_SPEED_KMH * 3600.0
         return Route(
-            distance_m=int(round(distance)),
-            duration_s=int(round(duration)),
+            distance_m=round(distance),
+            duration_s=round(duration),
             polyline=encode_polyline([pickup, dropoff]),
             source=SOURCE_FALLBACK,
         )
@@ -176,8 +164,8 @@ class OsrmRoutingProvider(RoutingProvider):
 
         best = payload["routes"][0]
         return Route(
-            distance_m=int(round(best["distance"])),
-            duration_s=int(round(best["duration"])),
+            distance_m=round(best["distance"]),
+            duration_s=round(best["duration"]),
             polyline=best.get("geometry", encode_polyline([pickup, dropoff])),
             source=SOURCE_OSRM,
         )

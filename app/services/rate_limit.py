@@ -168,3 +168,12 @@ class RateLimiter:
 
 
 limiter = RateLimiter()
+
+
+# /places/search is unauthenticated-adjacent and database-heavy: several index
+# scans plus trigram similarity per call. Generous enough for real typing (a
+# search fires per keystroke pause) and low enough to stop a scraper.
+PLACES_SEARCH_PER_IP = Limit("places_search_ip", capacity=120, per_seconds=60)
+
+# Quoting hits the routing engine, so it is capped separately and lower.
+QUOTE_PER_USER = Limit("quote_user", capacity=30, per_seconds=60)
