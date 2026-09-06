@@ -1,0 +1,8 @@
+osrm-data/
+*.osrm*
+*.osm.pbf
+.env
+.venv/
+__pycache__/
+*.pyc
+.idea/
