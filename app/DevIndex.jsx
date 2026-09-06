@@ -1,22 +1,40 @@
 import { Link } from 'react-router-dom';
 
-const screens = [
-  ['Auth', [['Splash', '/splash'], ['Login', '/login'], ['Signup', '/signup']]],
-  ['Passenger', [['Home', '/passenger/home'], ['Book', '/passenger/book'], ['History', '/passenger/history'], ['Profile', '/passenger/profile'], ['Support', '/passenger/support']]],
-  ['Driver', [['Dashboard', '/driver/dashboard'], ['Incoming request', '/driver/request']]],
-  ['Admin', [['Dashboard', '/admin/dashboard']]],
+const links = [
+  { section: 'Auth', pages: [['Splash', '/splash'], ['Login', '/login'], ['Signup', '/signup']] },
+  { section: 'Passenger', pages: [
+    ['Home', '/passenger/home'], ['Book a ride', '/passenger/book'], ['Confirm', '/passenger/confirm'],
+    ['Searching driver', '/passenger/searching'], ['Ride in progress', '/passenger/ride'],
+    ['Ride completed', '/passenger/completed'], ['History', '/passenger/history'],
+    ['Profile', '/passenger/profile'], ['Support', '/passenger/support'],
+  ]},
+  { section: 'Driver', pages: [
+    ['Dashboard', '/driver/dashboard'], ['Incoming request', '/driver/request'],
+    ['Ride accepted', '/driver/accepted'], ['Navigation', '/driver/navigate'],
+    ['Ride in progress', '/driver/ride'], ['End ride', '/driver/end'],
+    ['Earnings', '/driver/earnings'], ['History', '/driver/history'],
+    ['Profile', '/driver/profile'], ['Safety', '/driver/safety'],
+  ]},
+  { section: 'Admin', pages: [
+    ['Dashboard', '/admin/dashboard'], ['Users', '/admin/users'], ['Drivers', '/admin/drivers'],
+    ['Rides', '/admin/rides'], ['Stats', '/admin/stats'], ['Reports', '/admin/reports'],
+  ]},
 ];
 
 export default function DevIndex() {
   return (
-    <main>
-      <h1>VORA screen hub</h1>
-      {screens.map(([group, links]) => (
-        <section key={group}>
-          <h2>{group}</h2>
-          {links.map(([label, path]) => <Link key={path} to={path}>{label}</Link>)}
-        </section>
+    <div style={{ padding: 24, fontFamily: 'sans-serif' }}>
+      <h1>VORA — screen index (dev only)</h1>
+      {links.map(({ section, pages }) => (
+        <div key={section}>
+          <h3>{section}</h3>
+          <ul>
+            {pages.map(([label, path]) => (
+              <li key={path}><Link to={path}>{label}</Link></li>
+            ))}
+          </ul>
+        </div>
       ))}
-    </main>
+    </div>
   );
 }

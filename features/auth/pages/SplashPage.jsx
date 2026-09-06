@@ -1,1 +1,14 @@
-export default function SplashPage() { return <main><h1>Splash page</h1><p>Paste the splash screen implementation here.</p></main>; }
+import { useNavigate } from 'react-router-dom';
+
+export default function SplashPage() {
+  const navigate = useNavigate();
+  return (
+    <main className="app-shell splash">
+      <h1>VORA</h1>
+      <p className="eyebrow">Smart mobility for Cameroon</p>
+      <button className="primary-button" onClick={() => navigate('/login')}>
+        Get started
+      </button>
+    </main>
+  );
+}

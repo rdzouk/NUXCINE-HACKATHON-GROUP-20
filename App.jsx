@@ -18,8 +18,21 @@ import SupportPage from './features/passenger/pages/SupportPage';
 
 import DriverDashboardPage from './features/driver/pages/DashboardPage';
 import IncomingRequestPage from './features/driver/pages/IncomingRequestPage';
+import RideAcceptedPage from './features/driver/pages/RideAcceptedPage';
+import NavigationPage from './features/driver/pages/NavigationPage';
+import DriverRideInProgressPage from './features/driver/pages/RideInProgressPage';
+import EndRidePage from './features/driver/pages/EndRidePage';
+import EarningsPage from './features/driver/pages/EarningsPage';
+import DriverHistoryPage from './features/driver/pages/HistoryPage';
+import DriverProfilePage from './features/driver/pages/ProfilePage';
+import SafetyPage from './features/driver/pages/SafetyPage';
 
 import AdminDashboardPage from './features/admin/pages/DashboardPage';
+import UsersPage from './features/admin/pages/UsersPage';
+import DriversPage from './features/admin/pages/DriversPage';
+import RidesPage from './features/admin/pages/RidesPage';
+import StatsPage from './features/admin/pages/StatsPage';
+import ReportsPage from './features/admin/pages/ReportsPage';
 
 export default function App() {
   return (
@@ -27,9 +40,11 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<DevIndex />} />
+
           <Route path="/splash" element={<SplashPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
+
           <Route path="/passenger/home" element={<HomePage />} />
           <Route path="/passenger/book" element={<MapBookingPage />} />
           <Route path="/passenger/confirm" element={<ConfirmRidePage />} />
@@ -39,9 +54,24 @@ export default function App() {
           <Route path="/passenger/history" element={<PassengerHistoryPage />} />
           <Route path="/passenger/profile" element={<PassengerProfilePage />} />
           <Route path="/passenger/support" element={<SupportPage />} />
+
           <Route path="/driver/dashboard" element={<DriverDashboardPage />} />
           <Route path="/driver/request" element={<IncomingRequestPage />} />
+          <Route path="/driver/accepted" element={<RideAcceptedPage />} />
+          <Route path="/driver/navigate" element={<NavigationPage />} />
+          <Route path="/driver/ride" element={<DriverRideInProgressPage />} />
+          <Route path="/driver/end" element={<EndRidePage />} />
+          <Route path="/driver/earnings" element={<EarningsPage />} />
+          <Route path="/driver/history" element={<DriverHistoryPage />} />
+          <Route path="/driver/profile" element={<DriverProfilePage />} />
+          <Route path="/driver/safety" element={<SafetyPage />} />
+
           <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
+          <Route path="/admin/users" element={<UsersPage />} />
+          <Route path="/admin/drivers" element={<DriversPage />} />
+          <Route path="/admin/rides" element={<RidesPage />} />
+          <Route path="/admin/stats" element={<StatsPage />} />
+          <Route path="/admin/reports" element={<ReportsPage />} />
         </Routes>
       </BrowserRouter>
     </MockAuthProvider>
