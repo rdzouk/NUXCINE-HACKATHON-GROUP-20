@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VORA tracking</title>
+<!--
+  Live tracking surface. A testing tool, but the build plan is explicit that it
+  may end up on screen in front of a jury if the mobile app is not ready, so it
+  is built deliberately rather than thrown together.
+
+  It connects to WS /ws/passenger using the first-frame auth handshake, which
+  is the path a browser must take: the WebSocket API cannot set an
+  Authorization header, and the contract forbids a token in the query string
+  because query strings land in access logs, proxy logs and browser history.
+
+  Single file, Leaflet from a CDN, no build step.
+-->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  :root {
+    --ground: #14161a;
+    --ink: #e8e6e3;
+    --muted: #8b9099;
+    --line: #262a31;
+    --accent: #4a9eff;
+    --ok: #4ade80;
+    --warn: #facc15;
+    --bad: #f87171;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--ground);
+    color: var(--ink);
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+  }
+  #panel {
+    width: 360px;
+    flex: none;
+    padding: 22px;
+    overflow-y: auto;
+    border-right: 1px solid var(--line);
+  }
+  #map { flex: 1; }
+
+  h1 { font-size: 15px; font-weight: 600; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 20px; font-size: 13px; }
+
+  label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  input[type=text] {
+    width: 100%;
+    padding: 9px 11px;
+    background: #1b1e24;
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    color: var(--ink);
+    font: inherit;
+    margin-bottom: 8px;
+  }
+  input[type=text]:focus { outline: none; border-color: var(--accent); }
+
+  button {
+    padding: 9px 14px;
+    background: var(--accent);
+    border: none;
+    border-radius: 3px;
+    color: #0b0d10;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button:disabled { background: #2a2f37; color: var(--muted); cursor: default; }
+
+  h2 {
+    font-size: 13px; font-weight: 600; margin: 20px 0 8px;
+    padding-bottom: 8px; border-bottom: 1px solid var(--line);
+  }
+
+  .row {
+    display: flex; justify-content: space-between; gap: 12px;
+    padding: 5px 0; font-size: 13px;
+  }
+  .row span:first-child { color: var(--muted); }
+  .row span:last-child { text-align: right; }
+
+  /* A semantic status ramp. Green is connected, amber is degraded, red is
+     down. Deliberately not restyled to match the palette. */
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+  .dot.live  { background: var(--ok); }
+  .dot.stale { background: var(--warn); }
+  .dot.down  { background: var(--bad); }
+
+  #log {
+    font: 12px/1.5 ui-monospace, "SF Mono", Menlo, monospace;
+    color: var(--muted);
+    max-height: 220px;
+    overflow-y: auto;
+  }
+  #log div { padding: 2px 0; border-bottom: 1px solid var(--line); }
+  #log .rejected { color: var(--bad); }
+  #log .accepted { color: var(--ink); }
+</style>
+</head>
+<body>
+
+<div id="panel">
+  <h1>Live tracking</h1>
+  <p class="sub">Passenger view of the assigned driver.</p>
+
+  <label for="token">Passenger access token</label>
+  <input type="text" id="token" placeholder="eyJ..." autocomplete="off">
+
+  <label for="api">API base</label>
+  <input type="text" id="api" value="ws://localhost:8080/api/v1">
+
+  <button id="connect">Connect</button>
+
+  <h2>Connection</h2>
+  <div class="row"><span>Socket</span><span id="s-socket"><span class="dot down"></span>disconnected</span></div>
+  <div class="row"><span>Ride</span><span id="s-ride">-</span></div>
+  <div class="row"><span>Status</span><span id="s-status">-</span></div>
+  <div class="row"><span>Last fix</span><span id="s-age">-</span></div>
+  <div class="row"><span>Points</span><span id="s-points">0</span></div>
+  <div class="row"><span>ETA</span><span id="s-eta">-</span></div>
+
+  <h2>Frames</h2>
+  <div id="log"></div>
+</div>
+
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const map = L.map('map').setView([3.8480, 11.5021], 13);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; OpenStreetMap', maxZoom: 19,
+}).addTo(map);
+
+let ws = null;
+let marker = null;
+let trail = null;
+const path = [];
+let points = 0;
+let lastFixAt = null;
+
+const $ = (id) => document.getElementById(id);
+
+function log(text, cls = '') {
+  const el = document.createElement('div');
+  el.className = cls;
+  el.textContent = `${new Date().toLocaleTimeString()}  ${text}`;
+  $('log').prepend(el);
+  while ($('log').children.length > 80) $('log').lastChild.remove();
+}
+
+function setSocket(state, label) {
+  $('s-socket').innerHTML = `<span class="dot ${state}"></span>${label}`;
+}
+
+// A marker that has stopped updating looks identical to a stationary driver.
+// That ambiguity is the thing worth surfacing on a bad network, so the age of
+// the last fix is shown and goes amber before it goes stale.
+setInterval(() => {
+  if (!lastFixAt) return;
+  const age = Math.round((Date.now() - lastFixAt) / 1000);
+  $('s-age').textContent = `${age}s ago`;
+  if (age > 30) setSocket('stale', 'no fix for 30s');
+  else if (ws && ws.readyState === WebSocket.OPEN) setSocket('live', 'connected');
+}, 1000);
+
+function onLocation(msg) {
+  // The contract nests location so it can carry its own timestamp and the ride
+  // it belongs to. See docs/INTEGRATION.md.
+  const loc = msg.location || msg;
+  const at = [loc.lat, loc.lng];
+
+  points += 1;
+  lastFixAt = Date.now();
+  $('s-points').textContent = points;
+  $('s-eta').textContent = msg.eta_s != null ? `${Math.round(msg.eta_s / 60)} min` : '-';
+
+  if (!marker) {
+    marker = L.circleMarker(at, {
+      radius: 8, color: '#4a9eff', fillColor: '#4a9eff', fillOpacity: 0.9, weight: 2,
+    }).addTo(map).bindPopup('Driver');
+    trail = L.polyline([], { color: '#4a9eff', weight: 3, opacity: 0.6 }).addTo(map);
+    map.setView(at, 16);
+  } else {
+    marker.setLatLng(at);
+  }
+
+  path.push(at);
+  trail.setLatLngs(path);
+
+  // Follow only when the driver is about to leave the view, so the map does
+  // not jitter under the cursor on every fix.
+  if (!map.getBounds().pad(-0.25).contains(at)) map.panTo(at);
+
+  log(`location ${loc.lat.toFixed(5)}, ${loc.lng.toFixed(5)}`, 'accepted');
+}
+
+function connect() {
+  const token = $('token').value.trim();
+  if (!token) { log('paste a passenger access token first'); return; }
+
+  if (ws) { ws.close(); ws = null; }
+  points = 0; path.length = 0; lastFixAt = null;
+  if (marker) { map.removeLayer(marker); marker = null; }
+  if (trail) { map.removeLayer(trail); trail = null; }
+
+  setSocket('stale', 'connecting');
+  ws = new WebSocket(`${$('api').value.trim()}/ws/passenger`);
+
+  ws.onopen = () => {
+    // The first-frame handshake. A browser cannot set an Authorization header
+    // on a WebSocket, and the contract forbids the token in the query string.
+    ws.send(JSON.stringify({ type: 'auth', token }));
+    log('sent auth frame');
+  };
+
+  ws.onmessage = (event) => {
+    let msg;
+    try { msg = JSON.parse(event.data); } catch { return; }
+
+    switch (msg.type) {
+      case 'ready':
+        setSocket('live', 'connected');
+        $('s-ride').textContent = msg.ride_id ? msg.ride_id.slice(0, 8) : 'none';
+        $('s-status').textContent = msg.ride_status || '-';
+        log(`ready, ride ${msg.ride_id || 'none'}`);
+        break;
+      case 'driver_location':
+        onLocation(msg);
+        break;
+      case 'ride_update':
+        $('s-status').textContent = msg.status;
+        log(`ride is now ${msg.status}`);
+        break;
+      case 'ping':
+        ws.send(JSON.stringify({ type: 'pong' }));
+        break;
+      case 'error':
+        log(`${msg.code}: ${msg.message}`, 'rejected');
+        break;
+      default:
+        log(msg.type);
+    }
+  };
+
+  ws.onclose = (e) => {
+    setSocket('down', `closed (${e.code})`);
+    log(`socket closed: ${e.reason || e.code}`, 'rejected');
+  };
+  ws.onerror = () => setSocket('down', 'error');
+}
+
+$('connect').onclick = connect;
+$('token').addEventListener('keydown', (e) => { if (e.key === 'Enter') connect(); });
+</script>
+</body>
+</html>

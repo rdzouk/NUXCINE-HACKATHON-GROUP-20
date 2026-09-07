@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Suivi VORA</title>
+<!--
+  The public share view. What a relative sees when a passenger sends them the
+  link, and a demo asset in its own right: opening this in a private window is
+  the fastest way to show that it reveals a moving car and nothing else.
+
+  Deliberately absent, because the API never sends them: passenger identity,
+  fare, PIN, phone number, and the trace history. This page cannot leak them
+  because it is never given them.
+
+  Single file, Leaflet from a CDN, no build step, no auth.
+-->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  :root {
+    --ground: #14161a;
+    --ink: #e8e6e3;
+    --muted: #8b9099;
+    --line: #262a31;
+    --accent: #4a9eff;
+    --ok: #4ade80;
+    --warn: #facc15;
+    --bad: #f87171;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--ground);
+    color: var(--ink);
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  header { padding: 18px 22px 14px; border-bottom: 1px solid var(--line); }
+  h1 { font-size: 16px; font-weight: 600; margin: 0 0 2px; }
+  .sub { color: var(--muted); font-size: 13px; margin: 0; }
+
+  #map { flex: 1; min-height: 200px; }
+
+  #panel { padding: 16px 22px 22px; border-top: 1px solid var(--line); }
+  .row {
+    display: flex; justify-content: space-between; gap: 12px;
+    padding: 5px 0; font-size: 13px;
+  }
+  .row span:first-child { color: var(--muted); }
+  .row span:last-child { text-align: right; }
+
+  .status { font-weight: 600; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 7px; }
+  .dot.live { background: var(--ok); }
+  .dot.wait { background: var(--warn); }
+  .dot.gone { background: var(--bad); }
+
+  .plate {
+    font: 600 15px ui-monospace, "SF Mono", Menlo, monospace;
+    letter-spacing: 0.5px;
+  }
+
+  .notice {
+    margin-top: 14px; padding-top: 12px;
+    border-top: 1px solid var(--line);
+    color: var(--muted); font-size: 12px;
+  }
+
+  .setup { padding: 22px; }
+  input[type=text] {
+    width: 100%; padding: 9px 11px; margin-bottom: 8px;
+    background: #1b1e24; border: 1px solid var(--line);
+    border-radius: 3px; color: var(--ink); font: inherit;
+  }
+  input[type=text]:focus { outline: none; border-color: var(--accent); }
+  button {
+    padding: 9px 14px; background: var(--accent); border: none;
+    border-radius: 3px; color: #0b0d10; font: inherit; font-weight: 600;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Suivi du trajet</h1>
+  <p class="sub" id="headline">Chargement...</p>
+</header>
+
+<div id="map"></div>
+
+<div id="panel" hidden>
+  <div class="row">
+    <span>Statut</span>
+    <span class="status" id="s-status"><span class="dot wait"></span>-</span>
+  </div>
+  <div class="row"><span>Chauffeur</span><span id="s-driver">-</span></div>
+  <div class="row"><span>Vehicule</span><span id="s-vehicle">-</span></div>
+  <div class="row"><span>Immatriculation</span><span class="plate" id="s-plate">-</span></div>
+  <div class="row"><span>Destination</span><span id="s-dropoff">-</span></div>
+  <div class="row"><span>Position</span><span id="s-precision">-</span></div>
+  <div class="row"><span>Mise a jour</span><span id="s-age">-</span></div>
+
+  <p class="notice" id="notice">
+    Ce lien expire automatiquement et peut etre revoque a tout moment par le
+    passager. Il ne montre ni son identite, ni le prix, ni aucun numero de
+    telephone.
+  </p>
+</div>
+
+<div class="setup" id="setup">
+  <p class="sub">Collez un lien de partage, ou son jeton.</p>
+  <input type="text" id="token" placeholder="https://.../api/v1/share/..." autofocus>
+  <input type="text" id="api" value="http://localhost:8080/api/v1">
+  <button id="go">Suivre</button>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+
+let map = null, marker = null, trail = null, timer = null;
+const path = [];
+let lastAt = null;
+
+// Coarse positions are rounded to a few hundred metres by the server before the
+// trip starts. Drawing a wide circle rather than a pin is honest about that:
+// a precise-looking dot over an imprecise position is a lie the UI tells.
+const COARSE_RADIUS_M = 400;
+
+const STATUS_FR = {
+  accepted: 'Chauffeur assigne',
+  arriving: 'En route vers le passager',
+  arrived: 'Arrive au point de rendez-vous',
+  in_progress: 'Trajet en cours',
+  completed: 'Trajet termine',
+};
+
+function parseToken(raw) {
+  const trimmed = raw.trim();
+  const match = trimmed.match(/\/share\/([^/?#]+)/);
+  return match ? match[1] : trimmed;
+}
+
+function ensureMap() {
+  if (map) return;
+  map = L.map('map').setView([3.8480, 11.5021], 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap', maxZoom: 19,
+  }).addTo(map);
+}
+
+setInterval(() => {
+  if (!lastAt) return;
+  const age = Math.round((Date.now() - lastAt) / 1000);
+  $('s-age').textContent = age < 60 ? `il y a ${age}s` : `il y a ${Math.round(age / 60)} min`;
+}, 1000);
+
+function render(data) {
+  $('panel').hidden = false;
+  $('setup').hidden = true;
+
+  const terminal = data.ride_status === 'completed';
+  $('s-status').innerHTML =
+    `<span class="dot ${terminal ? 'gone' : 'live'}"></span>` +
+    (STATUS_FR[data.ride_status] || data.ride_status);
+  $('headline').textContent = terminal
+    ? 'Le trajet est termine.'
+    : 'Suivi en direct.';
+
+  $('s-driver').textContent = data.driver_first_name || '-';
+  const v = data.vehicle || {};
+  $('s-vehicle').textContent = [v.make, v.model, v.color].filter(Boolean).join(' ') || '-';
+  $('s-plate').textContent = v.plate || '-';
+  $('s-dropoff').textContent = data.dropoff_label || '-';
+
+  const loc = data.current_location;
+  if (!loc) {
+    $('s-precision').textContent = 'en attente';
+    return;
+  }
+
+  const coarse = loc.precision === 'coarse';
+  $('s-precision').textContent = coarse ? 'approximative' : 'precise';
+  lastAt = new Date(loc.updated_at).getTime();
+
+  ensureMap();
+  const at = [loc.lat, loc.lng];
+
+  if (marker) map.removeLayer(marker);
+  marker = coarse
+    ? L.circle(at, { radius: COARSE_RADIUS_M, color: '#facc15', weight: 2,
+                     fillColor: '#facc15', fillOpacity: 0.12 }).addTo(map)
+    : L.circleMarker(at, { radius: 9, color: '#4a9eff', fillColor: '#4a9eff',
+                           fillOpacity: 0.9, weight: 2 }).addTo(map);
+
+  if (!coarse) {
+    path.push(at);
+    if (!trail) trail = L.polyline([], { color: '#4a9eff', weight: 3, opacity: 0.6 }).addTo(map);
+    trail.setLatLngs(path);
+  }
+
+  if (path.length <= 1) map.setView(at, coarse ? 14 : 16);
+  else if (!map.getBounds().pad(-0.25).contains(at)) map.panTo(at);
+
+  if (terminal && timer) { clearInterval(timer); timer = null; }
+}
+
+async function poll(api, token) {
+  try {
+    const response = await fetch(`${api}/share/${token}`);
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      const code = body?.error?.code;
+      // Invalid, expired and revoked all answer 404 alike, on purpose: telling
+      // them apart would reveal which links were ever real.
+      $('headline').textContent =
+        code === 'SHARE_TOKEN_EXPIRED'
+          ? 'Ce lien a expire.'
+          : 'Ce lien n\'est plus valide.';
+      $('panel').hidden = true;
+      if (timer) { clearInterval(timer); timer = null; }
+      return;
+    }
+    render(await response.json());
+  } catch (err) {
+    $('headline').textContent = 'Connexion perdue. Nouvelle tentative...';
+  }
+}
+
+function start() {
+  const api = $('api').value.trim().replace(/\/$/, '');
+  const token = parseToken($('token').value);
+  if (!token) return;
+
+  if (timer) clearInterval(timer);
+  poll(api, token);
+  // Polling, not a socket. The share socket lands with the rest of Phase 5;
+  // five seconds is well inside what a worried relative would call live and
+  // costs the server almost nothing.
+  timer = setInterval(() => poll(api, token), 5000);
+}
+
+$('go').onclick = start;
+$('token').addEventListener('keydown', (e) => { if (e.key === 'Enter') start(); });
+
+// A token in the page URL means somebody opened a real shared link.
+const fromUrl = new URLSearchParams(location.search).get('t');
+if (fromUrl) {
+  $('token').value = fromUrl;
+  const api = new URLSearchParams(location.search).get('api');
+  if (api) $('api').value = api;
+  start();
+}
+</script>
+</body>
+</html>
