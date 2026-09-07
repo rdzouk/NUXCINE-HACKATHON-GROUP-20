@@ -65,3 +65,7 @@ MESSAGES: dict[ErrorCode, str] = {
 
     ErrorCode.INCIDENT_NOT_FOUND: "Signalement introuvable.",
 }
+
+MESSAGES[ErrorCode.KYC_DOCUMENT_ALREADY_REGISTERED] = (
+    "Ce document est deja enregistre sur un autre compte chauffeur."
+)

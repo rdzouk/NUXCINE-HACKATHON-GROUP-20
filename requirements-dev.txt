@@ -4,3 +4,7 @@ pytest>=8.3
 pytest-asyncio>=0.24
 ruff>=0.7
 pip-audit>=2.7
+
+# WebSocket client for scripts/spoof_test.py. Dev only: the server side is
+# native FastAPI/Starlette and needs no client library.
+websockets>=13.0

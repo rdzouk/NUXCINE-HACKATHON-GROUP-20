@@ -120,27 +120,74 @@ OTP_GLOBAL_BREAKER = Limit("otp_global", capacity=200, per_seconds=3600)
 OTP_VERIFY_PER_IP = Limit("otp_verify_ip", capacity=30, per_seconds=3600)
 
 
+# How long to stop dialling Redis after it fails.
+#
+# Every caller pays the connection timeout otherwise, on every request, which
+# turns a Redis blip into a site-wide latency collapse. Measured during the
+# Phase 7 degradation rehearsal: with the breaker only in the middleware,
+# /places/search still took 6.4 seconds per request during a Redis outage,
+# because the endpoint's own limiter dialled Redis independently.
+#
+# The breaker lives here rather than at any call site so that every limit,
+# present and future, inherits it. A limiter added later would otherwise
+# reintroduce the stall with nothing to catch it.
+BREAKER_COOLDOWN_S = 10.0
+
+
 class RateLimiter:
     def __init__(self) -> None:
         self._script = None
+        # Monotonic deadline before which Redis is not dialled. Process-local,
+        # so each worker discovers an outage once rather than never.
+        self._skip_until = 0.0
+
+    @property
+    def breaker_open(self) -> bool:
+        return time.monotonic() < self._skip_until
 
     async def _load(self):
         if self._script is None:
             self._script = get_redis().register_script(_TOKEN_BUCKET_LUA)
         return self._script
 
+    def _reset(self) -> None:
+        """Drop the cached script handle and close the breaker."""
+        self._script = None
+        self._skip_until = 0.0
+
     async def consume(
         self, limit: Limit, identifier: str, *, tokens: int = 1
     ) -> LimitDecision:
-        script = await self._load()
-        key = f"rl:{limit.name}:{identifier}"
+        # Breaker open: refuse immediately rather than waiting for a socket
+        # timeout to tell us what we already know.
+        #
+        # This still raises RedisError, which is what preserves the two
+        # different decisions callers make about an outage. The general
+        # limiter catches it and lets the request through; the OTP path
+        # catches it and refuses. Returning "allowed" here instead would
+        # silently convert every fail-closed limit into a fail-open one, and
+        # the OTP limiter is the only thing between us and an unbounded SMS
+        # bill.
+        if self.breaker_open:
+            raise RedisError(
+                f"rate limiter breaker open, retrying in "
+                f"{self._skip_until - time.monotonic():.1f}s"
+            )
+
         try:
+            script = await self._load()
+            key = f"rl:{limit.name}:{identifier}"
             allowed, remaining, retry_after = await script(
                 keys=[key],
                 args=[limit.capacity, limit.refill_rate, time.time(), tokens],
             )
         except RedisError:
-            logger.exception("rate_limiter_unavailable", limit=limit.name)
+            self._skip_until = time.monotonic() + BREAKER_COOLDOWN_S
+            logger.warning(
+                "rate_limiter_unavailable",
+                limit=limit.name,
+                cooldown_s=BREAKER_COOLDOWN_S,
+            )
             raise
         return LimitDecision(
             allowed=bool(allowed),
@@ -177,3 +224,9 @@ PLACES_SEARCH_PER_IP = Limit("places_search_ip", capacity=120, per_seconds=60)
 
 # Quoting hits the routing engine, so it is capped separately and lower.
 QUOTE_PER_USER = Limit("quote_user", capacity=30, per_seconds=60)
+
+
+# The public share view. Unauthenticated and enumerable, so it is capped, but
+# generously: a relative refreshing anxiously is the expected user, not an
+# attacker. Fails open on a Redis outage, unlike the OTP path.
+SHARE_VIEW_PER_IP = Limit("share_view_ip", capacity=120, per_seconds=60)

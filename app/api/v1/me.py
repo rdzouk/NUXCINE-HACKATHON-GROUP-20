@@ -4,9 +4,15 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from app.api.v1._stub import COMMON_ERRORS, not_implemented
+from app.api.v1._stub import COMMON_ERRORS
 from app.deps import CurrentUser, SessionDep
-from app.schemas.user import BalanceResponse, UserResponse, UserUpdateRequest
+from app.schemas.user import (
+    BalanceEntry,
+    BalanceResponse,
+    UserResponse,
+    UserUpdateRequest,
+)
+from app.services import cancellation
 from app.services.serializers import serialize_user
 
 router = APIRouter(tags=["me"])
@@ -71,8 +77,24 @@ async def update_me(
         "for the client to explain why or clear it."
     ),
 )
-async def get_balance(user: CurrentUser) -> BalanceResponse:
-    # The ledger lands in Phase 5. Kept as a 501 rather than returning a
-    # hardcoded zero: a client that sees a real zero will trust it and skip
-    # the settle-before-booking flow entirely.
-    not_implemented("Phase 5")
+async def get_balance(
+    user: CurrentUser, session: SessionDep
+) -> BalanceResponse:
+    outstanding = await cancellation.outstanding_balance(session, user.id)
+    entries = await cancellation.list_entries(session, user.id)
+
+    return BalanceResponse(
+        outstanding_xaf=outstanding,
+        entries=[
+            BalanceEntry(
+                id=e.id,
+                ride_id=e.ride_id,
+                kind=e.kind,
+                amount_xaf=e.amount_xaf,
+                settled_at=e.settled_at,
+                note=e.note,
+                created_at=e.created_at,
+            )
+            for e in entries
+        ],
+    )

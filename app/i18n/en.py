@@ -59,3 +59,7 @@ MESSAGES: dict[ErrorCode, str] = {
 
     ErrorCode.INCIDENT_NOT_FOUND: "Incident report not found.",
 }
+
+MESSAGES[ErrorCode.KYC_DOCUMENT_ALREADY_REGISTERED] = (
+    "That document is already registered to another driver account."
+)

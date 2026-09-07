@@ -37,3 +37,9 @@ shapely>=2.0
 # sign and chunking detail to get subtly wrong, and a wrong polyline draws a
 # route through the Gulf of Guinea.
 polyline>=2.0
+
+# Phase 5 trust and safety.
+# Signed share tokens. Not JWTs: these are one-off, single-purpose, revocable
+# blobs, and a JWT would add claims and an algorithm surface we do not need
+# while being indistinguishable from an access token in a log.
+itsdangerous>=2.2

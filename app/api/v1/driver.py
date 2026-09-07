@@ -19,7 +19,8 @@ from uuid import UUID
 
 from fastapi import APIRouter, status
 
-from app.api.v1._stub import COMMON_ERRORS, PUBLIC_ERRORS, not_implemented
+from app.api.v1._stub import COMMON_ERRORS, PUBLIC_ERRORS
+from app.api.v1.rides import _render as render_ride
 from app.deps import CurrentDriver, SessionDep
 from app.errors.codes import ErrorCode
 from app.errors.envelope import VoraError
@@ -36,7 +37,9 @@ from app.schemas.driver import (
     VehicleCapabilitiesResponse,
 )
 from app.schemas.user import KycStatus
+from app.services import accessibility, matching
 from app.services import kyc as kyc_service
+from app.services import matching as offers_service
 
 router = APIRouter(tags=["driver"])
 logger = get_logger("vora.driver")
@@ -124,9 +127,18 @@ async def get_kyc_status(
     response_model=DriverOffersResponse,
     responses=COMMON_ERRORS,
     summary="Open ride offers for this driver",
+    description=(
+        "Offers still open and unexpired. An offer carries the operational "
+        "facts needed to decide and nothing that identifies the passenger: "
+        "before acceptance the driver has no relationship to them (I3)."
+    ),
 )
-async def list_offers(driver: CurrentDriver) -> DriverOffersResponse:
-    not_implemented("Phase 3")
+async def list_offers(
+    driver: CurrentDriver, session: SessionDep
+) -> DriverOffersResponse:
+    return DriverOffersResponse(
+        offers=await offers_service.list_open_offers(session, driver=driver)
+    )
 
 
 @router.post(
@@ -134,9 +146,22 @@ async def list_offers(driver: CurrentDriver) -> DriverOffersResponse:
     response_model=OfferAcceptResponse,
     responses=COMMON_ERRORS,
     summary="Accept an offer",
+    description=(
+        "Atomic. Concurrent accepts on one offer, and concurrent accepts of "
+        "different offers on the same ride, both resolve to exactly one "
+        "winner. Every loser gets 409 OFFER_TAKEN rather than a 500. "
+        "scripts/race_test.py fires N of these at once and asserts one 200."
+    ),
 )
-async def accept_offer(offer_id: UUID, driver: CurrentDriver) -> OfferAcceptResponse:
-    not_implemented("Phase 3")
+async def accept_offer(
+    offer_id: UUID, driver: CurrentDriver, session: SessionDep
+) -> OfferAcceptResponse:
+    ride = await matching.claim_offer(session, offer_id=offer_id, driver=driver)
+    await session.commit()
+    await session.refresh(ride)
+    return OfferAcceptResponse(
+        ride=await render_ride(session, ride, "driver")
+    )
 
 
 @router.post(
@@ -144,9 +169,13 @@ async def accept_offer(offer_id: UUID, driver: CurrentDriver) -> OfferAcceptResp
     status_code=status.HTTP_204_NO_CONTENT,
     responses=COMMON_ERRORS,
     summary="Decline an offer",
+    description="A declined offer is never re-issued to this driver in a later wave.",
 )
-async def decline_offer(offer_id: UUID, driver: CurrentDriver) -> None:
-    not_implemented("Phase 3")
+async def decline_offer(
+    offer_id: UUID, driver: CurrentDriver, session: SessionDep
+) -> None:
+    await matching.decline_offer(session, offer_id=offer_id, driver=driver)
+    await session.commit()
 
 
 @router.get(
@@ -160,7 +189,7 @@ async def decline_offer(offer_id: UUID, driver: CurrentDriver) -> None:
     ),
 )
 async def list_capabilities() -> VehicleCapabilitiesResponse:
-    not_implemented("Phase 6")
+    return VehicleCapabilitiesResponse(capabilities=accessibility.CAPABILITIES)
 
 
 

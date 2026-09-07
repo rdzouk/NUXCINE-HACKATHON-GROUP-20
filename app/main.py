@@ -21,6 +21,7 @@ from app.errors.handlers import register_exception_handlers
 from app.logging import configure_logging, get_logger
 from app.middleware import (
     BodySizeLimitMiddleware,
+    GlobalRateLimitMiddleware,
     RequestIdMiddleware,
     RequestTimeoutMiddleware,
     SecurityHeadersMiddleware,
@@ -88,6 +89,10 @@ def create_app() -> FastAPI:
     # the layers below it, carries the header.
     app.add_middleware(RequestTimeoutMiddleware, timeout_s=settings.request_timeout_s)
     app.add_middleware(BodySizeLimitMiddleware, max_bytes=settings.max_body_bytes)
+    # Outside the body limit and the timeout, so a client being throttled is
+    # refused before the server spends a worker slot reading their body or
+    # starting a timer for work it is not going to do.
+    app.add_middleware(GlobalRateLimitMiddleware)
     app.add_middleware(
         CORSMiddleware,
         # Explicit allow-list. Settings rejects "*" at boot.

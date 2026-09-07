@@ -118,3 +118,62 @@ async def get_current_driver(
 
 CurrentDriver = Annotated[Driver, Depends(get_current_driver)]
 AdminUser = Annotated[User, Depends(require_role("admin"))]
+
+
+class RideContext:
+    """A ride plus the caller's relationship to it.
+
+    Handlers take this rather than a bare ride, so "am I the passenger or the
+    driver here" is answered once, by the dependency that already had to work
+    it out in order to authorise the request at all.
+    """
+
+    __slots__ = ("actor", "is_admin", "is_driver", "is_passenger", "ride", "user")
+
+    def __init__(self, ride: object, user: User, actor: str) -> None:
+        self.ride = ride
+        self.user = user
+        self.actor = actor
+        self.is_passenger = actor == "passenger"
+        self.is_driver = actor == "driver"
+        self.is_admin = actor == "admin"
+
+
+async def require_ride_participant(
+    ride_id: uuid.UUID, session: SessionDep, user: CurrentUser
+) -> RideContext:
+    """Object-level authorization for every ride-scoped route (I1).
+
+    One implementation, declared as a dependency on each route. Never a check
+    inside a handler: with a dozen ride-scoped routes, per-handler checks miss
+    one, and the one they miss is the IDOR. `scripts/idor_sweep.py` reads
+    openapi.json and asserts a stranger's token gets 404 on every one of them,
+    so a route added later without this dependency fails the sweep rather than
+    shipping.
+
+    **A non-participant gets 404, not 403.** A 403 confirms a ride with that id
+    exists, which turns a guessed id into a probe for whether somebody is
+    currently travelling.
+    """
+    from app.models.ride import Ride
+
+    ride = await session.get(Ride, ride_id)
+    if ride is None:
+        raise VoraError(ErrorCode.RIDE_NOT_FOUND)
+
+    if user.role == "admin":
+        return RideContext(ride, user, "admin")
+
+    if ride.passenger_id == user.id:
+        return RideContext(ride, user, "passenger")
+
+    if ride.driver_id is not None:
+        driver = await session.get(Driver, ride.driver_id)
+        if driver is not None and driver.user_id == user.id:
+            return RideContext(ride, user, "driver")
+
+    # Deliberately identical to the not-found case above.
+    raise VoraError(ErrorCode.RIDE_NOT_FOUND)
+
+
+RideParticipant = Annotated[RideContext, Depends(require_ride_participant)]
