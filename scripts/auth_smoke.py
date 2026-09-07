@@ -141,7 +141,13 @@ def main() -> int:
     base = args.base.rstrip("/")
     # Each run uses a distinct test number so that the per-phone hourly bucket
     # from a previous run does not make this one look like a failure.
-    phone = args.phone or f"+23760000000{uuid.uuid4().int % 10}"
+    # A four-digit suffix, not one digit.
+    #
+    # With a single digit this had a one-in-ten chance of generating exactly
+    # the "unregistered" number used below. Requesting that second OTP
+    # invalidates any live challenge for the same phone, which is correct
+    # behaviour and made this test fail intermittently on its own fixture.
+    phone = args.phone or f"+23760000000{uuid.uuid4().int % 10000:04d}"
 
     print(f"VORA auth smoke against {base}")
     print(f"{DIM}test number: {phone}{RESET}\n")
@@ -165,6 +171,8 @@ def main() -> int:
 
     # Registration state must not be observable. An unknown number and a known
     # one have to answer identically, or this endpoint enumerates customers.
+    # Deliberately outside the four-digit space the number above draws from,
+    # so the two can never collide.
     unknown = "+237600000009"
     r_unknown = client.post(f"{base}/auth/otp/request", json={"phone": unknown})
     check(

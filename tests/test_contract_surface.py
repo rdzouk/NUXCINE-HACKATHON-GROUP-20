@@ -79,30 +79,85 @@ def test_every_contract_route_exists(app):
 
 def test_no_undeclared_routes(app):
     """An added route is a contract change and has to be declared here."""
-    extra = _http_routes(app) - EXPECTED_ROUTES
+    from app.api.v1 import dev
+
+    expected = set(EXPECTED_ROUTES)
+    if dev.is_enabled():
+        # Development-only, and not registered at all in production. That this
+        # set changes with the environment is the point: an endpoint which
+        # fabricates GPS positions for arbitrary rides must not exist on a real
+        # deployment, so it is absent from the route table rather than guarded
+        # inside each handler.
+        expected |= {
+            ("POST", f"{API}/dev/simulate-driver"),
+            ("GET", f"{API}/dev/realtime-stats"),
+        }
+
+    extra = _http_routes(app) - expected
     assert not extra, f"undeclared routes present: {sorted(extra)}"
 
 
 @pytest.mark.parametrize(
-    "path",
+    "app_env,debug,enabled",
     [
-        f"{API}/ws/driver",
-        f"{API}/ws/passenger",
-        f"{API}/ws/share/sometokenvalue123456",
+        ("development", True, True),
+        ("development", False, False),
+        # Both of these would be enabled if the gate were DEBUG alone.
+        ("production", True, False),
+        ("prod", True, False),
     ],
 )
-def test_websocket_routes_accept_and_report_not_implemented(client, path):
-    """Behavioural, not structural.
+def test_dev_routes_need_both_conditions(monkeypatch, app_env, debug, enabled):
+    """The gate is DEBUG *and* not-production, never either alone.
 
-    A connect that succeeds and closes with a readable reason proves more than
-    a route-table lookup: it is what the mobile client will actually see, and
-    it distinguishes 'not built yet' from 'the network is down'.
+    A single condition would be one typo away from exposing an endpoint that
+    fabricates GPS positions for arbitrary rides on a real deployment.
     """
-    with client.websocket_connect(path) as socket:
+    from app.api.v1 import dev
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "app_env", app_env)
+    monkeypatch.setattr(settings, "debug", debug)
+    assert dev.is_enabled() is enabled
+
+
+def test_share_socket_refuses_a_bad_token(client):
+    """A forged, expired or revoked link is answered alike.
+
+    Distinguishing them would tell somebody working through forwarded links
+    which ones were ever real. The socket says no and closes rather than
+    hanging, so a viewer sees an error instead of an empty map.
+    """
+    with client.websocket_connect(f"{API}/ws/share/sometokenvalue123456") as socket:
         frame = socket.receive_json()
         assert frame["type"] == "error"
-        assert frame["code"] == "NOT_IMPLEMENTED"
-        assert frame["planned_phase"].startswith("Phase")
+        assert frame["code"] == "SHARE_TOKEN_INVALID"
+        assert "NOT_IMPLEMENTED" not in frame["code"]
+
+
+@pytest.mark.parametrize("path", [f"{API}/ws/driver", f"{API}/ws/passenger"])
+def test_live_sockets_refuse_an_unauthenticated_client(client, path):
+    """The socket is accepted, then closed with a readable reason.
+
+    Accepting before authenticating is deliberate: rejecting the handshake
+    gives a browser no way to tell an expired token from a network failure,
+    and a client that cannot distinguish those either retries forever or gives
+    up on something recoverable.
+    """
+    with client.websocket_connect(path) as socket:
+        socket.send_json({"type": "location", "lat": 3.8, "lng": 11.5})
+        frame = socket.receive_json()
+        assert frame["type"] == "error"
+        assert frame["code"] == "UNAUTHENTICATED"
+
+
+@pytest.mark.parametrize("path", [f"{API}/ws/driver", f"{API}/ws/passenger"])
+def test_live_sockets_reject_a_forged_token(client, path):
+    with client.websocket_connect(path) as socket:
+        socket.send_json({"type": "auth", "token": "not.a.real.jwt"})
+        frame = socket.receive_json()
+        assert frame["type"] == "error"
+        assert frame["code"] in ("INVALID_TOKEN", "TOKEN_EXPIRED")
 
 
 def test_every_error_code_has_a_status():
@@ -121,24 +176,41 @@ def test_every_error_code_has_messages_in_both_languages():
     assert not missing_en, f"no English message for: {missing_en}"
 
 
-@pytest.mark.parametrize(
-    "method,path",
-    [
-        ("GET", f"{API}/rides/00000000-0000-0000-0000-000000000000"),
-        ("GET", f"{API}/places/search?q=warda"),
-        ("GET", f"{API}/vehicles/capabilities"),
-    ],
-)
-def test_stubs_return_the_contract_envelope(client, method, path):
-    response = client.request(method, path)
-    assert response.status_code == 501
+def test_the_error_envelope_has_exactly_the_contract_shape(client):
+    """Every error, whatever produced it, is the same four keys.
+
+    Uses an unauthenticated request rather than a stub endpoint. Phase 6
+    implemented the last 501, and pinning envelope behaviour to whichever route
+    happens to be unfinished means the test dies the moment it is finished.
+    An unauthenticated call to a protected route stays an error forever.
+    """
+    response = client.get(f"{API}/me")
+    assert response.status_code == 401
     body = response.json()
     assert set(body) == {"error"}
     error = body["error"]
     assert set(error) == {"code", "message", "details", "request_id"}
-    assert error["code"] == "NOT_IMPLEMENTED"
+    assert error["code"] == "UNAUTHENTICATED"
     assert error["message"], "message must not be empty"
     assert error["request_id"], "request_id must not be empty"
+
+
+def test_no_route_in_the_contract_is_still_a_stub(client):
+    """§6 is fully implemented as of Phase 6.
+
+    A 501 reaching the jury is a feature that was promised in the contract and
+    is not there, which is worse than one that was never listed.
+    """
+    schema = client.get("/openapi.json").json()
+    stubs = []
+    for path, methods in schema["paths"].items():
+        for method in methods:
+            if method not in ("get", "post", "patch", "put", "delete"):
+                continue
+            response = client.request(method.upper(), path)
+            if response.status_code == 501:
+                stubs.append(f"{method.upper()} {path}")
+    assert not stubs, f"still returning 501: {stubs}"
 
 
 def test_schema_failure_is_400_not_422(client):
@@ -179,9 +251,7 @@ def test_security_headers_present(client):
 
 def test_request_id_is_echoed_when_valid(client):
     supplied = "11111111-2222-3333-4444-555555555555"
-    response = client.get(
-        f"{API}/vehicles/capabilities", headers={"X-Request-ID": supplied}
-    )
+    response = client.get(f"{API}/me", headers={"X-Request-ID": supplied})
     assert response.headers["x-request-id"] == supplied
     assert response.json()["error"]["request_id"] == supplied
 
@@ -189,9 +259,7 @@ def test_request_id_is_echoed_when_valid(client):
 def test_malicious_request_id_is_replaced(client):
     """An arbitrary client string must never reach the structured logs."""
     forged = 'evil-not-a-uuid{"level":"info"}'
-    response = client.get(
-        f"{API}/vehicles/capabilities", headers={"X-Request-ID": forged}
-    )
+    response = client.get(f"{API}/me", headers={"X-Request-ID": forged})
     assert response.headers["x-request-id"] != forged
     assert len(response.headers["x-request-id"]) == 36
 
@@ -205,17 +273,28 @@ def test_error_response_never_leaks_a_phone_number(client):
 
 
 def test_french_is_the_default_language(client):
-    response = client.get(f"{API}/vehicles/capabilities")
-    assert response.json()["error"]["message"] == (
-        "Cette fonctionnalite n'est pas encore disponible."
-    )
+    response = client.get(f"{API}/me")
+    assert response.json()["error"]["message"] == "Authentification requise."
 
 
 def test_english_is_served_on_request(client):
     response = client.get(
-        f"{API}/vehicles/capabilities", headers={"Accept-Language": "en-GB,en;q=0.9"}
+        f"{API}/me", headers={"Accept-Language": "en-GB,en;q=0.9"}
     )
-    assert response.json()["error"]["message"] == "This feature is not available yet."
+    assert response.json()["error"]["message"] == "Authentication required."
+
+
+def test_the_capability_vocabulary_is_served(client):
+    """Phase 6. The client's accessibility filter is populated from the server,
+    so a wording fix does not need an app release."""
+    response = client.get(f"{API}/vehicles/capabilities")
+    assert response.status_code == 200
+    capabilities = response.json()["capabilities"]
+    assert {c["key"] for c in capabilities} == {
+        "ramp", "boot_space", "front_seat", "driver_assist", "guide_animal",
+    }
+    for capability in capabilities:
+        assert capability["label_fr"] and capability["label_en"]
 
 
 @pytest.mark.parametrize(

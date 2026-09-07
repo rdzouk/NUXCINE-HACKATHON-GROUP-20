@@ -1,0 +1,19 @@
+meta {
+  name: offers
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{baseUrl}}/api/v1/driver/offers
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{access_token}}
+}
+
+docs {
+  Needs a driver token whose KYC is verified. Offers arrive in widening waves; an offer for a ride somebody else already took is filtered in the query, not swept later.
+}

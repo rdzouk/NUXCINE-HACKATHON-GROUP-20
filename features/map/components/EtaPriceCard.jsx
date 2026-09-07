@@ -1,6 +1,6 @@
 export default function EtaPriceCard({ quote, loading, error }) {
   if (loading) return <div className="eta-card">Calculating route...</div>;
-  if (error) return <div className="eta-card eta-card--error">Couldn't get a quote. Please try again.</div>;
+  if (error) return <div className="eta-card eta-card--error">{error.message}</div>;
   if (!quote) return null;
 
   return (

@@ -1,26 +1,147 @@
+import {
+  clearSession,
+  getAccessToken,
+  getRefreshToken,
+  storeRefreshedSession,
+} from '../../auth/services/session';
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const AUTH_PATHS = new Set(['/auth/otp/request', '/auth/otp/verify', '/auth/refresh']);
 
-export async function apiFetch(path, options = {}) {
-  const token = localStorage.getItem('access_token'); // set by whatever auth flow lands first
+let refreshPromise = null;
 
-  const res = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options.headers,
-    },
-  });
-
-  const body = await res.json().catch(() => null);
-
-  if (!res.ok) {
-    // Matches the contract's error envelope: { error: { code, message, details, request_id } }
-    const err = new Error(body?.error?.message ?? 'Request failed');
-    err.code = body?.error?.code;
-    err.status = res.status;
-    throw err;
+function redirectToLogin() {
+  if (typeof window === 'undefined') {
+    return;
   }
 
-  return body;
+  if (window.location.pathname !== '/login') {
+    window.location.assign('/login');
+  }
+}
+
+function buildHeaders(token, headers = {}) {
+  const mergedHeaders = new Headers(headers);
+
+  if (!mergedHeaders.has('Content-Type')) {
+    mergedHeaders.set('Content-Type', 'application/json');
+  }
+
+  if (token) {
+    mergedHeaders.set('Authorization', `Bearer ${token}`);
+  }
+
+  return mergedHeaders;
+}
+
+async function parseResponseBody(res) {
+  if (res.status === 204) {
+    return null;
+  }
+
+  const contentType = res.headers.get('content-type') ?? '';
+
+  if (contentType.includes('application/json')) {
+    return res.json().catch(() => null);
+  }
+
+  const text = await res.text().catch(() => '');
+  return text || null;
+}
+
+function createApiError(res, body) {
+  const err = new Error(body?.error?.message ?? 'Request failed');
+  err.code = body?.error?.code ?? null;
+  err.status = res.status;
+  err.details = body?.error?.details ?? null;
+  err.requestId = body?.error?.request_id ?? null;
+  return err;
+}
+
+async function performRequest(path, options = {}, token = getAccessToken()) {
+  const { headers, ...restOptions } = options;
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    ...restOptions,
+    headers: buildHeaders(token, headers),
+  });
+  const body = await parseResponseBody(res);
+  return { res, body };
+}
+
+async function refreshAccessToken() {
+  if (refreshPromise) {
+    return refreshPromise;
+  }
+
+  const refreshToken = getRefreshToken();
+
+  if (!refreshToken) {
+    return false;
+  }
+
+  refreshPromise = (async () => {
+    const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
+      method: 'POST',
+      headers: buildHeaders(null),
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+
+    const body = await parseResponseBody(res);
+
+    if (!res.ok) {
+      throw createApiError(res, body);
+    }
+
+    storeRefreshedSession(body);
+    return true;
+  })();
+
+  try {
+    return await refreshPromise;
+  } catch {
+    clearSession();
+    redirectToLogin();
+    return false;
+  } finally {
+    refreshPromise = null;
+  }
+}
+
+export async function apiFetch(path, options = {}) {
+  const { skipAuthRefresh = false, ...requestOptions } = options;
+  const { res, body } = await performRequest(path, requestOptions);
+
+  if (res.ok) {
+    return body;
+  }
+
+  if (res.status === 401 && !skipAuthRefresh && !AUTH_PATHS.has(path)) {
+    const refreshed = await refreshAccessToken();
+
+    if (refreshed) {
+      const retried = await performRequest(path, requestOptions, getAccessToken());
+
+      if (retried.res.ok) {
+        return retried.body;
+      }
+
+      const retryError = createApiError(retried.res, retried.body);
+
+      if (retried.res.status === 401) {
+        clearSession();
+        redirectToLogin();
+      }
+
+      throw retryError;
+    }
+  }
+
+  const err = createApiError(res, body);
+
+  if (res.status === 401 && path === '/auth/refresh') {
+    clearSession();
+    redirectToLogin();
+  }
+
+  throw err;
 }

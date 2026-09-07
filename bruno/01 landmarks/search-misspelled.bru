@@ -1,0 +1,19 @@
+meta {
+  name: search misspelled
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/places/search?q=warda%20carefour
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{access_token}}
+}
+
+docs {
+  The same place, misspelled and with the words the other way round. This is the request that shows the gazetteer is doing real work.
+}

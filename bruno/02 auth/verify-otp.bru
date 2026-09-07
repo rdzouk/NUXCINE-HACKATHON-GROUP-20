@@ -1,0 +1,33 @@
+meta {
+  name: verify otp
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/otp/verify
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "challenge_id": "{{challenge_id}}",
+    "code": "0000"
+  }
+}
+
+script:post-response {
+  bru.setVar("access_token", res.body.access_token);
+  bru.setVar("refresh_token", res.body.refresh_token);
+}
+
+docs {
+  Replace `code` with the one from the logs. The code is hashed with argon2 at 32 MiB, not compared as a string: a four-digit secret is only safe if guessing it is expensive.
+
+  Writes `access_token` for every request below.
+}

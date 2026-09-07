@@ -99,7 +99,25 @@ def login(client: httpx.Client, base: str, phone: str) -> tuple[str, str]:
     )
     r.raise_for_status()
     body = r.json()
-    return body["access_token"], body["user"]["id"]
+    token, user_id = body["access_token"], body["user"]["id"]
+
+    # Prove the token works before handing it back.
+    #
+    # `deps.py` answers INVALID_TOKEN for two unrelated situations: a token
+    # that will not decode, and one that decodes to a user id no longer in the
+    # database. Those want completely different investigations and the error
+    # alone does not say which, so check here where the phone and the user id
+    # are still in hand, and report both.
+    probe = client.get(f"{base}/me", headers={"Authorization": f"Bearer {token}"})
+    if probe.status_code != 200:
+        still_there = psql(f"SELECT count(*) FROM users WHERE id = '{uid(user_id)}'")
+        raise RuntimeError(
+            f"a freshly minted token was refused: {probe.status_code} "
+            f"{probe.text[:120]} (phone={phone}, user_id={user_id}, "
+            f"row_still_in_db={still_there})"
+        )
+
+    return token, user_id
 
 
 def main() -> int:
@@ -176,13 +194,17 @@ def main() -> int:
         )
     print()
 
+    # A fresh identity per run. The CNI hash is unique across drivers by
+    # design (it is the ban surface), so reusing one fixture value collides
+    # with the previous run rather than testing anything.
+    run_id = uuid.uuid4().hex[:10].upper()
     print("document submission")
     kinds = ["cni", "driving_licence", "vehicle_registration", "vehicle_photo",
              "driver_photo"]
     for kind in kinds:
         r = client.post(
             f"{base}/driver/kyc/documents", headers=dauth,
-            json={"kind": kind, "reference": f"REF-{kind.upper()}-12345"},
+            json={"kind": kind, "reference": f"REF-{kind.upper()}-{run_id}"},
         )
         if r.status_code != 201:
             check(f"submit {kind}", False, f"got {r.status_code}: {r.text[:160]}")

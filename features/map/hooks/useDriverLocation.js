@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 
-// Connects to the contract's WS /ws/passenger channel. Auth is via the
-// Authorization header at connect time — never a query string (contract rule).
+// Connects to WS /ws/passenger with first-frame auth from the integration contract.
 export function useDriverLocation(rideId) {
   const [position, setPosition] = useState(null);
   const wsRef = useRef(null);
@@ -10,17 +9,23 @@ export function useDriverLocation(rideId) {
     if (!rideId) return;
 
     const token = localStorage.getItem('access_token');
-    const wsUrl = `${import.meta.env.VITE_WS_BASE_URL}/ws/passenger`;
-    const ws = new WebSocket(wsUrl, [], { headers: { Authorization: `Bearer ${token}` } });
-    // Note: browser WebSocket API doesn't support custom headers directly —
-    // coordinate with your backend owner on the actual first-frame token
-    // handshake they implement per the contract's "never a query string" rule.
+    const ws = new WebSocket(`${import.meta.env.VITE_WS_BASE_URL}/ws/passenger`);
     wsRef.current = ws;
+
+    ws.onopen = () => {
+      ws.send(JSON.stringify({ type: 'auth', token }));
+    };
 
     ws.onmessage = (event) => {
       const msg = JSON.parse(event.data);
-      if (msg.type === 'driver_location') {
-        setPosition({ lat: msg.lat, lng: msg.lng, heading: msg.heading });
+
+      if (msg.type === 'ping') {
+        ws.send(JSON.stringify({ type: 'pong' }));
+        return;
+      }
+
+      if (msg.type === 'driver_location' && msg.ride_id === rideId && msg.location) {
+        setPosition(msg.location);
       }
     };
 

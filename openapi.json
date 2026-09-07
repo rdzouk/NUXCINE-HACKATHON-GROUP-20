@@ -875,7 +875,7 @@
           "places"
         ],
         "summary": "Resolve a landmark by name",
-        "description": "Layered cascade: exact alias, then fuzzy landmark match (trigram plus tsvector, accent-insensitive, tolerant of French, English and pidgin mixing), then quartier, then street fallback. The winning layer is returned as `match_type` so the client can show provenance.",
+        "description": "Layered cascade: exact alias, then fuzzy landmark match (trigram plus tsvector, accent-insensitive, tolerant of French, English and pidgin mixing), then quartier, then street fallback. The winning layer is returned as `match_type` so the client can show provenance instead of presenting a guess with the same confidence as a certainty.\n\nAn empty `results` array means nothing in the gazetteer matched; the client should offer a map pin rather than an error.",
         "operationId": "search_places_api_v1_places_search_get",
         "parameters": [
           {
@@ -1027,6 +1027,7 @@
           "places"
         ],
         "summary": "Describe a coordinate the way a person would",
+        "description": "Returns the nearest landmark and a label built from it, such as '200 m de Carrefour Warda'. That is how somebody actually gives this location to a driver, and it is more useful than a street name that may not exist or may not be known.",
         "operationId": "reverse_geocode_api_v1_places_reverse_get",
         "parameters": [
           {
@@ -1148,7 +1149,7 @@
           "rides"
         ],
         "summary": "Price a trip",
-        "description": "Returns a signed, five-minute quote covering both exclusive and corridor pricing. The fare is re-derived server-side at ride creation; a client-supplied price is never an input (I2).",
+        "description": "Returns a signed, five-minute quote covering both exclusive and corridor pricing. The fare is derived server-side from a routed distance and re-derived again at ride creation; a price in a request body is never read (I2).\n\n`routing_source` reports whether the distance came from the routing engine or from a straight-line fallback, so the client can tell the user the estimate is approximate rather than presenting a guess as a surveyed figure.",
         "operationId": "quote_ride_api_v1_rides_quote_post",
         "requestBody": {
           "content": {
@@ -1280,7 +1281,7 @@
           "rides"
         ],
         "summary": "Create a ride from a quote",
-        "description": "Requires an Idempotency-Key header (I8). Mobile networks here drop and retry; without de-duplication one tap creates two rides. The key is scoped per user and expires after 24 hours.",
+        "description": "Requires an Idempotency-Key header (I8). Mobile networks here drop and retry; without de-duplication one tap creates two rides. A repeated key returns the original ride with 200 rather than creating a second.\n\nThe fare is re-derived from the signed quote, never read from the request. The quote is single-use: presenting it twice returns 409 QUOTE_ALREADY_USED.",
         "operationId": "create_ride_api_v1_rides_post",
         "parameters": [
           {
@@ -1425,6 +1426,7 @@
           "rides"
         ],
         "summary": "List the caller's rides",
+        "description": "Rides where the caller is the passenger or the assigned driver. The restriction is a WHERE clause, not a filter applied after fetching.",
         "operationId": "list_rides_api_v1_rides_get",
         "parameters": [
           {
@@ -1721,828 +1723,6 @@
         }
       }
     },
-    "/api/v1/rides/{ride_id}/cancel": {
-      "post": {
-        "tags": [
-          "rides"
-        ],
-        "summary": "Cancel a ride",
-        "description": "Free before acceptance, or within 30 s of it. After that a fee accrues to the ledger and must be settled before the next booking.",
-        "operationId": "cancel_ride_api_v1_rides__ride_id__cancel_post",
-        "parameters": [
-          {
-            "name": "ride_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Ride Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RideCancelRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RideCancelResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Malformed request or schema failure",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid access token",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Authenticated but role-forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found, or not visible to the caller",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "State conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Semantically invalid",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Rate limited. Carries Retry-After.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "Not implemented yet (Phase 0 stub)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Dependency unavailable",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/rides/{ride_id}/share": {
-      "post": {
-        "tags": [
-          "rides"
-        ],
-        "summary": "Mint a trip-share link",
-        "operationId": "create_share_link_api_v1_rides__ride_id__share_post",
-        "parameters": [
-          {
-            "name": "ride_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Ride Id"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ShareLinkResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Malformed request or schema failure",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid access token",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Authenticated but role-forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found, or not visible to the caller",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "State conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Semantically invalid",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Rate limited. Carries Retry-After.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "Not implemented yet (Phase 0 stub)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Dependency unavailable",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "rides"
-        ],
-        "summary": "Revoke every share link for this ride",
-        "operationId": "revoke_share_link_api_v1_rides__ride_id__share_delete",
-        "parameters": [
-          {
-            "name": "ride_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Ride Id"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          },
-          "400": {
-            "description": "Malformed request or schema failure",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid access token",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Authenticated but role-forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found, or not visible to the caller",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "State conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Semantically invalid",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Rate limited. Carries Retry-After.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "Not implemented yet (Phase 0 stub)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Dependency unavailable",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/rides/{ride_id}/messages": {
-      "post": {
-        "tags": [
-          "rides"
-        ],
-        "summary": "Send a canned message",
-        "description": "Template keys only. Free text is never accepted here. This replaces phone contact between the parties entirely (I3).",
-        "operationId": "send_message_api_v1_rides__ride_id__messages_post",
-        "parameters": [
-          {
-            "name": "ride_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Ride Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RideMessageRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RideMessageResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Malformed request or schema failure",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid access token",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Authenticated but role-forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found, or not visible to the caller",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "State conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Semantically invalid",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Rate limited. Carries Retry-After.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "Not implemented yet (Phase 0 stub)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Dependency unavailable",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/rides/{ride_id}/sos": {
-      "post": {
-        "tags": [
-          "rides"
-        ],
-        "summary": "Raise an SOS",
-        "description": "Seals an immutable snapshot: trace summary, driver and vehicle identifiers, timestamps, both parties. This path gets its own error handling and must succeed under partial system degradation.",
-        "operationId": "raise_sos_api_v1_rides__ride_id__sos_post",
-        "parameters": [
-          {
-            "name": "ride_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Ride Id"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/IncidentResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Malformed request or schema failure",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid access token",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Authenticated but role-forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found, or not visible to the caller",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "State conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Semantically invalid",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Rate limited. Carries Retry-After.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "Not implemented yet (Phase 0 stub)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Dependency unavailable",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/rides/{ride_id}/report": {
-      "post": {
-        "tags": [
-          "rides"
-        ],
-        "summary": "File an incident report",
-        "operationId": "report_incident_api_v1_rides__ride_id__report_post",
-        "parameters": [
-          {
-            "name": "ride_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Ride Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/IncidentReportRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/IncidentResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Malformed request or schema failure",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid access token",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Authenticated but role-forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found, or not visible to the caller",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "State conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Semantically invalid",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Rate limited. Carries Retry-After.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "Not implemented yet (Phase 0 stub)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Dependency unavailable",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/rides/{ride_id}/arrived": {
       "post": {
         "tags": [
@@ -2682,7 +1862,7 @@
           "rides"
         ],
         "summary": "Start the trip with the passenger's PIN",
-        "description": "The passenger reads the four-digit PIN aloud and the driver enters it. This is what makes impersonation at pickup fail. Wrong PIN returns 403; five failures escalate to support.",
+        "description": "The passenger reads the four-digit PIN aloud and the driver enters it. This is what makes impersonation at pickup fail: somebody who read the plate off the app still does not have the PIN. A wrong PIN returns 403; five failures escalate to support rather than silently unlocking.",
         "operationId": "start_ride_api_v1_rides__ride_id__start_post",
         "parameters": [
           {
@@ -2826,7 +2006,7 @@
           "rides"
         ],
         "summary": "Complete the trip",
-        "description": "The final fare is computed from the server-held GPS trace, never from a client-reported distance (I2).",
+        "description": "The final fare is computed from the server-held GPS trace where one exists and from the quoted distance otherwise. Which basis was used is written to the ride's event log, so the reason for a charge is never ambiguous. A client-reported distance is never an input (I2).",
         "operationId": "complete_ride_api_v1_rides__ride_id__complete_post",
         "parameters": [
           {
@@ -2847,6 +2027,830 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/RideCompleteResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request or schema failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated but role-forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or not visible to the caller",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "State conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Semantically invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited. Carries Retry-After.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Not implemented yet (Phase 0 stub)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/rides/{ride_id}/cancel": {
+      "post": {
+        "tags": [
+          "rides"
+        ],
+        "summary": "Cancel a ride",
+        "operationId": "cancel_ride_api_v1_rides__ride_id__cancel_post",
+        "parameters": [
+          {
+            "name": "ride_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Ride Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RideCancelRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RideCancelResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request or schema failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated but role-forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or not visible to the caller",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "State conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Semantically invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited. Carries Retry-After.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Not implemented yet (Phase 0 stub)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/rides/{ride_id}/share": {
+      "post": {
+        "tags": [
+          "rides"
+        ],
+        "summary": "Mint a trip-share link",
+        "description": "Creates a signed, expiring, revocable link that shows a strict subset of the ride to somebody with no account: driver first name, vehicle, position and ETA. No passenger identity, no fare, no PIN, no phone.\n\nPosition is coarse until the trip is in progress, so a link shared while waiting does not reveal exactly where the passenger is standing. Minting a new link revokes any previous one for the same ride.",
+        "operationId": "create_share_link_api_v1_rides__ride_id__share_post",
+        "parameters": [
+          {
+            "name": "ride_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Ride Id"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShareLinkResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request or schema failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated but role-forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or not visible to the caller",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "State conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Semantically invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited. Carries Retry-After.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Not implemented yet (Phase 0 stub)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "rides"
+        ],
+        "summary": "Revoke every share link for this ride",
+        "description": "Immediate. A link already forwarded onward stops working, which is the property that makes sharing safe to offer at all.",
+        "operationId": "revoke_share_link_api_v1_rides__ride_id__share_delete",
+        "parameters": [
+          {
+            "name": "ride_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Ride Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "description": "Malformed request or schema failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated but role-forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or not visible to the caller",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "State conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Semantically invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited. Carries Retry-After.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Not implemented yet (Phase 0 stub)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/rides/{ride_id}/messages": {
+      "post": {
+        "tags": [
+          "rides"
+        ],
+        "summary": "Send a canned message",
+        "description": "Template keys only; free text is never accepted. This replaces phone contact between the parties entirely (I3): it cannot carry harassment or an off-app number, it translates without a pipeline, it costs a few bytes on a bad network, and it works for users who cannot take a call.",
+        "operationId": "send_message_api_v1_rides__ride_id__messages_post",
+        "parameters": [
+          {
+            "name": "ride_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Ride Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RideMessageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RideMessageResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request or schema failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated but role-forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or not visible to the caller",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "State conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Semantically invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited. Carries Retry-After.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Not implemented yet (Phase 0 stub)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/rides/{ride_id}/sos": {
+      "post": {
+        "tags": [
+          "rides"
+        ],
+        "summary": "Raise an SOS",
+        "description": "Seals an immutable snapshot: trace summary, driver and vehicle identifiers, timestamps, both parties. A database trigger refuses any later change to it.\n\nTakes no body. Somebody pressing this is not going to type, and the snapshot degrades to a smaller one rather than failing if part of the gathering does: this runs at exactly the moment the system is least likely to be healthy.",
+        "operationId": "raise_sos_api_v1_rides__ride_id__sos_post",
+        "parameters": [
+          {
+            "name": "ride_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Ride Id"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request or schema failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated but role-forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or not visible to the caller",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "State conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Semantically invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited. Carries Retry-After.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Not implemented yet (Phase 0 stub)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/rides/{ride_id}/report": {
+      "post": {
+        "tags": [
+          "rides"
+        ],
+        "summary": "File an incident report",
+        "description": "Same sealed snapshot as an SOS. A fare dispute raised a day later still needs the trace as it was, not as it is.",
+        "operationId": "report_incident_api_v1_rides__ride_id__report_post",
+        "parameters": [
+          {
+            "name": "ride_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Ride Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IncidentReportRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentResponse"
                 }
               }
             }
@@ -3334,6 +3338,7 @@
           "driver"
         ],
         "summary": "Open ride offers for this driver",
+        "description": "Offers still open and unexpired. An offer carries the operational facts needed to decide and nothing that identifies the passenger: before acceptance the driver has no relationship to them (I3).",
         "operationId": "list_offers_api_v1_driver_offers_get",
         "responses": {
           "200": {
@@ -3455,6 +3460,7 @@
           "driver"
         ],
         "summary": "Accept an offer",
+        "description": "Atomic. Concurrent accepts on one offer, and concurrent accepts of different offers on the same ride, both resolve to exactly one winner. Every loser gets 409 OFFER_TAKEN rather than a 500. scripts/race_test.py fires N of these at once and asserts one 200.",
         "operationId": "accept_offer_api_v1_driver_offers__offer_id__accept_post",
         "parameters": [
           {
@@ -3588,6 +3594,7 @@
           "driver"
         ],
         "summary": "Decline an offer",
+        "description": "A declined offer is never re-issued to this driver in a later wave.",
         "operationId": "decline_offer_api_v1_driver_offers__offer_id__decline_post",
         "parameters": [
           {
@@ -3948,7 +3955,7 @@
           "share"
         ],
         "summary": "Follow a shared trip",
-        "description": "No authentication. The token is signed, expiring and revocable. Location is coarse until the ride is in_progress, so a link shared before pickup does not reveal where the passenger is waiting. An invalid or expired token returns 404, never 403.",
+        "description": "No authentication. The token is signed, expiring and revocable, and the row behind it can be killed before the signature lapses.\n\nLocation is coarse until the ride is in_progress, so a link shared before pickup does not reveal exactly where the passenger is waiting. An invalid, expired or revoked token all return 404 alike: telling them apart would say which links were ever real.",
         "operationId": "view_shared_ride_api_v1_share__token__get",
         "parameters": [
           {
@@ -4243,6 +4250,261 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DriverAdminView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request or schema failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated but role-forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or not visible to the caller",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "State conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Semantically invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited. Carries Retry-After.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Not implemented yet (Phase 0 stub)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/dev/simulate-driver": {
+      "post": {
+        "tags": [
+          "dev"
+        ],
+        "summary": "Walk a synthetic driver along a ride's route (development only)",
+        "description": "Emits realistic location frames along the ride's own route at a configurable speed, so live tracking can be demonstrated without a second phone and a second person.\n\nReturns immediately; the walk runs in the background and stops on its own when the ride leaves a trackable state. Points go through the same plausibility filter and the same fan-out as a real driver's, so what is demonstrated is the real path and not a special case.",
+        "operationId": "simulate_driver_api_v1_dev_simulate_driver_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SimulateDriverRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulateDriverResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request or schema failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated but role-forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or not visible to the caller",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "State conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Semantically invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited. Carries Retry-After.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Not implemented yet (Phase 0 stub)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/dev/realtime-stats": {
+      "get": {
+        "tags": [
+          "dev"
+        ],
+        "summary": "Live socket registry counts (development only)",
+        "operationId": "realtime_stats_api_v1_dev_realtime_stats_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Realtime Stats Api V1 Dev Realtime Stats Get"
                 }
               }
             }
@@ -6609,6 +6871,72 @@
           "expires_at"
         ],
         "title": "ShareView"
+      },
+      "SimulateDriverRequest": {
+        "properties": {
+          "ride_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Ride Id"
+          },
+          "speed_kmh": {
+            "type": "number",
+            "maximum": 120.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Speed Kmh",
+            "description": "Average speed along the route. Yaounde traffic averages 20 to 30.",
+            "default": 25.0
+          },
+          "polyline": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Polyline",
+            "description": "Encoded polyline to walk. Defaults to the ride's route."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ride_id"
+        ],
+        "title": "SimulateDriverRequest"
+      },
+      "SimulateDriverResponse": {
+        "properties": {
+          "ride_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Ride Id"
+          },
+          "points": {
+            "type": "integer",
+            "title": "Points"
+          },
+          "estimated_duration_s": {
+            "type": "integer",
+            "title": "Estimated Duration S"
+          },
+          "speed_kmh": {
+            "type": "number",
+            "title": "Speed Kmh"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ride_id",
+          "points",
+          "estimated_duration_s",
+          "speed_kmh"
+        ],
+        "title": "SimulateDriverResponse"
       },
       "User": {
         "properties": {

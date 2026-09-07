@@ -4,12 +4,24 @@ import { searchPlaces } from '../services/geocoding';
 export default function PlaceSearch({ label, defaultValue, onSelect }) {
   const [query, setQuery] = useState(defaultValue?.name ?? '');
   const [results, setResults] = useState([]);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const handleChange = async (e) => {
     const value = e.target.value;
     setQuery(value);
-    if (value.length < 3) return setResults([]);
-    setResults(await searchPlaces(value));
+    setErrorMessage('');
+
+    if (value.length < 3) {
+      setResults([]);
+      return;
+    }
+
+    try {
+      setResults(await searchPlaces(value));
+    } catch (error) {
+      setResults([]);
+      setErrorMessage(error.message);
+    }
   };
 
   const handlePick = (place) => {
@@ -29,6 +41,7 @@ export default function PlaceSearch({ label, defaultValue, onSelect }) {
           ))}
         </ul>
       )}
+      {errorMessage ? <p>{errorMessage}</p> : null}
     </div>
   );
 }

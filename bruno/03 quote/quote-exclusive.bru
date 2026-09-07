@@ -1,0 +1,35 @@
+meta {
+  name: quote exclusive
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/api/v1/rides/quote
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{access_token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "pickup": {"lat": 3.8760, "lng": 11.5120, "label": "Carrefour Warda"},
+    "dropoff": {"lat": 3.8660, "lng": 11.5170, "label": "Marche Central"},
+    "seats": 1,
+    "mode": "exclusive"
+  }
+}
+
+script:post-response {
+  bru.setVar("quote_id", res.body.quote_id);
+}
+
+docs {
+  The fare is computed on the server and returned **signed**. The response carries both the exclusive fare and the per-seat corridor fare so the client can show the choice.
+
+  Fares round to 50 XAF because people pay in coins here.
+}

@@ -1,0 +1,19 @@
+meta {
+  name: search warda
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/places/search?q=warda
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{access_token}}
+}
+
+docs {
+  **Bet 1.** Ask anyone in Yaounde for an address and they name a carrefour. `match_type` says how the match was made: `exact_alias` means somebody typed what people actually say. Fuzzy matching runs in the Postgres index with trigrams and unaccent, never in Python.
+}

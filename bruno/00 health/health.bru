@@ -1,0 +1,15 @@
+meta {
+  name: health
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/health
+  body: none
+  auth: none
+}
+
+docs {
+  Liveness plus the state of every dependency. Never rate limited: throttling the endpoint a monitor polls gets you paged for the throttle rather than the outage.
+}

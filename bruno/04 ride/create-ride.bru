@@ -1,0 +1,38 @@
+meta {
+  name: create ride
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/api/v1/rides
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{access_token}}
+  Content-Type: application/json
+  Idempotency-Key: {{$guid}}
+}
+
+body:json {
+  {
+    "quote_id": "{{quote_id}}",
+    "seats": 1,
+    "accessibility_required": []
+  }
+}
+
+script:post-response {
+  bru.setVar("ride_id", res.body.ride.id);
+  bru.setVar("pin", res.body.ride.pin);
+}
+
+docs {
+  **I2.** The fare is re-derived from the signed quote, never read from this body. Nothing a client sends influences the price.
+
+  **I8.** The `Idempotency-Key` header is required. Mobile networks here drop and retry; without it one tap creates two rides. Send the same key twice and you get 200 with the original ride, not a second one.
+
+  The quote is single use: presenting it again is 409.
+}

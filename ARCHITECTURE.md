@@ -1,8 +1,8 @@
 # Architecture
 
-Status: Phase 0. The stack, its seams and the designed-not-built list are
-settled. The ride state machine and the corridor matching diagram land with
-Phases 3 and 6.
+Status: complete, Phases 0 to 7. Every route in the frozen §6 contract is
+implemented, HTTP and WebSocket alike, and every phase's acceptance check runs
+from one command.
 
 ## Shape
 
@@ -31,6 +31,86 @@ flowchart TB
 Nothing but Caddy binds to the host. Postgres and Redis are reachable on the
 internal network only. A Postgres exposed on 5432 with a hackathon password is
 how a demo box becomes someone else's.
+
+## The ride state machine
+
+Every transition goes through one function, `transition_ride`, because that is
+the only place `ride_events` is written. A handler that sets `ride.status`
+directly produces a ride whose history has a hole in it, and the hole is
+invisible until somebody needs it during a dispute (I7).
+
+The actor on each edge is enforced, not documentation. A passenger cannot
+complete their own ride; a driver cannot cancel one as the passenger.
+
+```mermaid
+stateDiagram-v2
+    [*] --> requested
+    requested --> matching: system
+    matching --> accepted: driver claims an offer
+    accepted --> arriving: driver
+    arriving --> arrived: driver
+    accepted --> arrived: driver
+    arrived --> in_progress: driver, with the PIN
+    in_progress --> completed: driver
+    completed --> [*]
+
+    requested --> expired: no driver in 60 s
+    matching --> expired: no driver in 60 s
+    requested --> cancelled_passenger: passenger
+    matching --> cancelled_passenger: passenger
+    accepted --> cancelled_passenger: passenger, fee may apply
+    arriving --> cancelled_passenger: passenger, fee may apply
+    arrived --> cancelled_passenger: passenger, fee may apply
+    accepted --> cancelled_driver: driver
+    arriving --> cancelled_driver: driver
+    arrived --> cancelled_driver: driver
+
+    expired --> [*]
+    cancelled_passenger --> [*]
+    cancelled_driver --> [*]
+```
+
+The PIN gate on `arrived -> in_progress` is the one edge that is not just
+bookkeeping. It is what stops a stranger at the kerb claiming to be the
+assigned driver, and it is why face-match verification was not built: Law
+2024/017 forbids the biometric processing that would require.
+
+## Corridor matching
+
+Bet 2. Not ride-sharing added to a taxi app: the shared-corridor model that
+already exists here, with exclusive hire added on top.
+
+```mermaid
+flowchart TB
+    J["Joiner books mode=corridor"] --> Q{"Both endpoints within
+    400 m of a live route?"}
+    Q -->|no| X["Ordinary matching:
+    summon a fresh vehicle"]
+    Q -->|yes| D{"Travelling the same
+    way along it?"}
+    D -->|no| X
+    D -->|yes| C{"Detour under
+    8 percent and 4 min?"}
+    C -->|no| X
+    C -->|yes| L{"Under 3 legs
+    and a seat free?"}
+    L -->|no| X
+    L -->|yes| H["Hold the seats,
+    ask the driver"]
+    H -->|declines| R["Release the seats"] --> X
+    H -->|accepts| B["Confirm the leg,
+    price it along the driven route"]
+```
+
+Containment, not proximity: matching on "is the driver nearby" would put
+somebody travelling the opposite way into the car. The detour is measured as
+the offset from the driven line rather than the length of the joiner's trip,
+and it is checked **before** the driver is asked, so a passenger already
+aboard never pays for a bad match.
+
+Every geometric test is one SQL statement against the GiST index on
+`route_geom`. Deciding containment in Python would mean decoding every live
+polyline on each booking.
 
 ## Stack choices and what each one costs
 
@@ -146,7 +226,10 @@ management is surveillance wearing a safety label. This design is what separates
 trust infrastructure from surveillance, and it is worth more said out loud than
 half-built.
 
-**Redis pub/sub fan-out.** The `LocationSink` swap described above.
+**Redis pub/sub fan-out.** The `LocationSink` swap described above. The
+interface exists and has one in-process implementation; a Redis-backed one
+would satisfy the same two methods with no caller changing. That is the whole
+point of naming a seam rather than building behind it.
 
 **Rust location ingest.** As described above.
 
@@ -164,12 +247,18 @@ preferences are cheap to store and should be given away.
 |---|---|---|
 | 0 | Contract, skeleton, deploy | done |
 | 1 | Identity, auth, KYC gate | done |
-| 2 | Geo core, gazetteer, fare quoting | next |
-| 3 | Ride lifecycle and matching | |
-| 4 | Realtime tracking, driver simulator | |
-| 5 | Trust and safety | |
-| 6 | Accessibility, corridor, payment abstraction | |
-| 7 | Harden, seed, document, rehearse | |
+| 2 | Geo core, gazetteer, fare quoting | done |
+| 3 | Ride lifecycle and matching | done |
+| 4 | Realtime tracking, driver simulator | done |
+| 5 | Trust and safety | done |
+| 6 | Accessibility, corridor, payment abstraction | done |
+| 7 | Harden, seed, document, rehearse | done |
+
+Every phase's acceptance check is runnable in one command:
+
+```bash
+./scripts/acceptance.sh
+```
 
 Contract questions resolved at Phase 0 are in
 [docs/CONTRACT_DECISIONS.md](docs/CONTRACT_DECISIONS.md), including two places

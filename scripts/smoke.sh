@@ -53,14 +53,30 @@ echo
 
 # --------------------------------------------------- stubs and envelopes ----
 # One route per shape: path param, request body, public unauthenticated.
-STUBS=(
-    "GET|/rides/00000000-0000-0000-0000-000000000000|501"
-    "GET|/places/search?q=warda|501"
-    "GET|/vehicles/capabilities|501"
+# Routes still returning the 501 stub. Shrinks as phases land, so a route
+# that stops being a stub without this list being updated fails loudly rather
+# than quietly asserting nothing.
+#
+# Empty as of Phase 6: every route in the contract is implemented, HTTP and
+# WebSocket alike. The list stays here rather than being deleted, because it is
+# the thing that would catch a route regressing to 501.
+STUBS=()
+
+# Routes that are implemented and must NOT be stubs any more. Listed explicitly
+# so that a phase which accidentally reverts one to 501 fails here rather than
+# passing quietly.
+IMPLEMENTED=(
+    "GET|/places/search?q=warda|200"
+    "GET|/vehicles/capabilities|200"
+    "GET|/rides/00000000-0000-0000-0000-000000000000|401"
+    "GET|/me|401"
 )
 
 echo "stub routes return the contract envelope"
-for entry in "${STUBS[@]}"; do
+if [ ${#STUBS[@]} -eq 0 ]; then
+    ok "no route in the contract is still a stub"
+fi
+for entry in ${STUBS[@]+"${STUBS[@]}"}; do
     IFS='|' read -r method path expected <<< "$entry"
     body=$(mktemp)
     code=$(curl -sS -X "$method" -o "$body" -w '%{http_code}' "${BASE}${path}")
@@ -73,6 +89,23 @@ for entry in "${STUBS[@]}"; do
     check "  code is NOT_IMPLEMENTED"       "NOT_IMPLEMENTED" "$(jq -r .error.code "$body")"
     rm -f "$body"
 done
+echo
+
+echo "implemented routes are no longer stubs"
+for entry in "${IMPLEMENTED[@]}"; do
+    IFS='|' read -r method path expected <<< "$entry"
+    code=$(curl -sS -X "$method" -o /dev/null -w '%{http_code}' "${BASE}${path}")
+    check "${method} ${path} -> ${expected}" "$expected" "$code"
+done
+echo
+
+echo "the capability vocabulary is served"
+CAPS=$(curl -sS "${BASE}/vehicles/capabilities")
+check "five capabilities" "5" "$(jq -r '.capabilities | length' <<< "$CAPS")"
+check "each has a French label" "true" \
+    "$(jq -r '[.capabilities[].label_fr | length > 0] | all' <<< "$CAPS")"
+check "each has an English label" "true" \
+    "$(jq -r '[.capabilities[].label_en | length > 0] | all' <<< "$CAPS")"
 echo
 
 # ------------------------------------------------------------ validation ----

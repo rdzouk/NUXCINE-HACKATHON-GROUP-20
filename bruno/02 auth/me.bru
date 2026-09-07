@@ -1,0 +1,19 @@
+meta {
+  name: me
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/api/v1/me
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{access_token}}
+}
+
+docs {
+  The caller's own profile. Accessibility here is stored as vehicle requirements, never as anything about the person (I9).
+}

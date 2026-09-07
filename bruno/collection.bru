@@ -1,0 +1,13 @@
+auth {
+  mode: none
+}
+
+docs {
+  The VORA demo, as runnable requests in the order you would fire
+  them. Start at 02 auth, read the OTP out of the API logs, then
+  work down: everything below reuses the token automatically.
+
+      docker compose logs --tail 20 api | grep otp_console
+
+  Set the environment to `local` before running anything.
+}

@@ -1,0 +1,33 @@
+meta {
+  name: request otp
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/otp/request
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "phone": "+237600000001"
+  }
+}
+
+script:post-response {
+  bru.setVar("challenge_id", res.body.challenge_id);
+}
+
+docs {
+  Three per phone per hour, ten per day, twenty per IP per hour, behind a global circuit breaker. The limiter fails **closed** here: sending SMS costs money, so an outage must not become an unbounded bill.
+
+  In development the code is printed to the API logs:
+
+      docker compose logs --tail 20 api | grep otp_console
+}

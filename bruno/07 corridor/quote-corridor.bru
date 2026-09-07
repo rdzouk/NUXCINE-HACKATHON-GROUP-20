@@ -1,0 +1,35 @@
+meta {
+  name: quote corridor
+  type: http
+  seq: 13
+}
+
+post {
+  url: {{baseUrl}}/api/v1/rides/quote
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{access_token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "pickup": {"lat": 3.8760, "lng": 11.5120, "label": "Carrefour Warda"},
+    "dropoff": {"lat": 3.9010, "lng": 11.5540, "label": "Ngousso Chapelle"},
+    "seats": 1,
+    "mode": "corridor"
+  }
+}
+
+script:post-response {
+  bru.setVar("corridor_quote_id", res.body.quote_id);
+}
+
+docs {
+  **Bet 2.** Each passenger pays for their own leg at 0.62 of the exclusive rate, measured along the route actually driven.
+
+  Three passengers each pay less than exclusive hire while the driver collects more than one exclusive fare, because the vehicle is not being sold to one person. Verified end to end by `scripts/corridor_flow.py`.
+}

@@ -13,9 +13,9 @@ export function useRoute() {
       const result = await getQuote(origin, destination, seats, mode);
       setQuote(result);
     } catch (err) {
-      // No client-side fallback price here — a failed quote must not be
+      // No client-side fallback price here. A failed quote must not be
       // guessed at (I2). Show the error, let the user retry.
-      setError(err.message);
+      setError(err);
       setQuote(null);
     } finally {
       setLoading(false);

@@ -1,0 +1,25 @@
+meta {
+  name: share trip
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{baseUrl}}/api/v1/rides/{{ride_id}}/share
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{access_token}}
+}
+
+script:post-response {
+  bru.setVar("share_token", res.body.token);
+}
+
+docs {
+  Mints a signed, expiring, revocable link. Open it in a private window: location is visible, identity and fare and phone are not.
+
+  Position stays coarse, about 300 m, until the ride is `in_progress`, so a link shared while waiting does not reveal which doorway somebody is standing in.
+}

@@ -1,0 +1,15 @@
+meta {
+  name: view shared trip
+  type: http
+  seq: 12
+}
+
+get {
+  url: {{baseUrl}}/api/v1/share/{{share_token}}
+  body: none
+  auth: none
+}
+
+docs {
+  No authentication. Invalid, expired and revoked tokens all answer **404 alike**: telling them apart would reveal which links were ever real.
+}

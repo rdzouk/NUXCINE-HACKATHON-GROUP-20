@@ -1,0 +1,21 @@
+meta {
+  name: capabilities
+  type: http
+  seq: 14
+}
+
+get {
+  url: {{baseUrl}}/api/v1/vehicles/capabilities
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{access_token}}
+}
+
+docs {
+  **I9.** Every capability describes the **vehicle**, never a person: "Vehicule equipe d'une rampe", not "pour personnes handicapees".
+
+  Law No. 2024/017 prohibits processing health data. "This passenger uses a wheelchair" is health data; "this trip needs a ramp" is a logistics requirement. A unit test asserts the wording, because that distinction is exactly what a well-meaning copy edit erases.
+}
