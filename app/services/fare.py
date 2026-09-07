@@ -31,6 +31,7 @@ model faked from nothing is the sort of claim a jury checks.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 # Rounding granularity. See the module docstring: cash, in coins.
@@ -68,10 +69,17 @@ DEFAULT_FARE_CONFIG = FareConfig()
 
 
 def round_to_coins(amount: float, *, granularity: int = ROUND_TO_XAF) -> int:
-    """Round to something a passenger can actually hand over in cash."""
+    """Round to something a passenger can actually hand over in cash.
+
+    Half-up, not Python's built-in `round`. `round` implements banker's
+    rounding, which sends halves to the nearest *even* multiple: `round(0.5)`
+    is 0, so 25 XAF rounds down to nothing while 75 rounds up to 100. Besides
+    producing a free ride at the bottom of the range, treating identical halves
+    inconsistently is the sort of thing a driver notices and stops trusting.
+    """
     if amount <= 0:
         return 0
-    return int(granularity * round(amount / granularity))
+    return int(math.floor(amount / granularity + 0.5) * granularity)
 
 
 @dataclass(frozen=True)

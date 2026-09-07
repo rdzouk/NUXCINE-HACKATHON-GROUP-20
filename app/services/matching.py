@@ -35,6 +35,7 @@ from app.logging import get_logger
 from app.models.ride import Ride, RideOffer
 from app.models.user import Driver, Vehicle
 from app.schemas.ride import ActorType, RideStatus
+from app.services import corridor
 from app.services.rides import record_event, transition_ride
 
 logger = get_logger("vora.matching")
@@ -332,6 +333,20 @@ async def claim_offer(
         )
         raise VoraError(ErrorCode.OFFER_TAKEN) from exc
 
+    # Corridor seat accounting, once the claim is safely won.
+    #
+    # Deliberately after the flush: until the unique indexes have accepted the
+    # claim there is no driver, and confirming a leg for a claim that then lost
+    # a race would sell a seat in a car this passenger is not in.
+    if ride.mode == "corridor":
+        leg = await corridor.confirm_leg(session, ride=ride)
+        if leg is None:
+            # Nobody held a leg for this ride, so it is the corridor's first
+            # passenger rather than a joiner. They take leg 1 of their own ride,
+            # which is what makes the seat they occupy visible to capacity.
+            await corridor.ensure_parent_leg(session, ride=ride)
+        await session.flush()
+
     logger.info(
         "offer_claimed",
         ride_id=str(ride.id),
@@ -353,6 +368,9 @@ async def decline_offer(
     if offer.state == "open":
         offer.state = "declined"
         offer.responded_at = datetime.now(UTC)
+        # Declining a corridor join gives the held seats back. Consent is real,
+        # so a driver who says no must cost the passenger nothing but the wait.
+        was_corridor_join = await corridor.release_leg(session, offer.ride_id)
         await record_event(
             session,
             ride_id=offer.ride_id,
@@ -362,6 +380,19 @@ async def decline_offer(
             metadata={"offer_id": str(offer.id), "wave": offer.wave},
         )
         await session.flush()
+
+        # A declined join must not strand the passenger.
+        #
+        # A corridor join is a single targeted offer, so declining it leaves a
+        # ride in `matching` with nothing out. Falling back to an ordinary wave
+        # summons a fresh vehicle instead. The candidate query already excludes
+        # any driver who has seen this ride, so the declining driver is not
+        # asked twice.
+        if was_corridor_join:
+            ride = await session.get(Ride, offer.ride_id)
+            if ride is not None and RideStatus(ride.status) is RideStatus.MATCHING:
+                wave, radius, _ = WAVES[0]
+                await run_wave(session, ride=ride, wave=wave, radius_m=radius)
 
 
 async def expire_stale_rides(session: AsyncSession) -> int:
@@ -397,4 +428,71 @@ async def expire_stale_rides(session: AsyncSession) -> int:
             ),
             {"ids": [r.id for r in rides]},
         )
+        # An unanswered corridor join must not leave its seats held. Without
+        # this a driver who ignores one offer loses a seat for the rest of the
+        # shift, with nothing on screen to explain why.
+        for ride in rides:
+            await corridor.release_leg(session, ride.id)
     return len(rides)
+
+
+async def list_open_offers(session: AsyncSession, *, driver: Driver) -> list:
+    """Offers this driver can still act on.
+
+    Expired ones are filtered in the query rather than swept first: a driver
+    opening the app should never be shown an offer they cannot take, and
+    relying on a sweep having run is how a stale offer reaches the screen.
+    """
+    from app.schemas.driver import RideOffer as RideOfferSchema
+
+    rows = await session.execute(
+        text(
+            """
+            SELECT
+                o.id, o.ride_id, o.wave, o.expires_at, o.created_at,
+                o.distance_to_pickup_m,
+                r.mode, r.seats, r.pickup_label, r.dropoff_label,
+                r.quoted_distance_m, r.quoted_duration_s, r.quoted_fare_xaf,
+                r.accessibility_required,
+                ST_Y(r.pickup_geom::geometry)  AS p_lat,
+                ST_X(r.pickup_geom::geometry)  AS p_lng,
+                ST_Y(r.dropoff_geom::geometry) AS d_lat,
+                ST_X(r.dropoff_geom::geometry) AS d_lng
+            FROM ride_offers o
+            JOIN rides r ON r.id = o.ride_id
+            WHERE o.driver_id = :driver_id
+              AND o.state = 'open'
+              AND o.expires_at > now()
+              AND r.status IN ('requested', 'matching')
+            ORDER BY o.distance_to_pickup_m ASC
+            """
+        ),
+        {"driver_id": driver.id},
+    )
+
+    from app.schemas.common import NamedPlace, RideMode, VehicleCapability
+
+    known = {v.value for v in VehicleCapability}
+    return [
+        RideOfferSchema(
+            id=row.id,
+            ride_id=row.ride_id,
+            mode=RideMode(row.mode),
+            seats=row.seats,
+            pickup=NamedPlace(lat=row.p_lat, lng=row.p_lng, label=row.pickup_label),
+            dropoff=NamedPlace(lat=row.d_lat, lng=row.d_lng, label=row.dropoff_label),
+            distance_to_pickup_m=row.distance_to_pickup_m,
+            trip_distance_m=row.quoted_distance_m,
+            trip_duration_s=row.quoted_duration_s,
+            fare_xaf=row.quoted_fare_xaf,
+            accessibility_required=[
+                VehicleCapability(c)
+                for c in (row.accessibility_required or [])
+                if c in known
+            ],
+            wave=row.wave,
+            expires_at=row.expires_at,
+            created_at=row.created_at,
+        )
+        for row in rows
+    ]

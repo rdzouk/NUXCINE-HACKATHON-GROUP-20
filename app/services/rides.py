@@ -24,6 +24,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
+from geoalchemy2 import WKTElement
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -36,6 +37,7 @@ from app.schemas.ride import ActorType, RideStatus
 from app.security import hashing
 from app.services import quotes
 from app.services.fare import DEFAULT_FARE_CONFIG, quote_both
+from app.services.routing import get_routing_provider
 from app.services.state_machine import LIVE, assert_transition
 
 logger = get_logger("vora.rides")
@@ -211,6 +213,24 @@ async def create_ride(
             ErrorCode.ACTIVE_RIDE_EXISTS, details={"ride_id": str(live.id)}
         )
 
+    # The cancellation ledger has teeth here, and only here.
+    #
+    # A debt that never blocks anything is a number in a table. Refusing the
+    # next booking is what makes a cancellation fee real without any money
+    # moving, which is the whole reason this is a debt ledger rather than a
+    # wallet in a cash market.
+    #
+    # The error names the amount so the client can say what is owed rather
+    # than only that something is.
+    from app.services.cancellation import outstanding_balance
+
+    owed = await outstanding_balance(session, passenger.id)
+    if owed > 0:
+        raise VoraError(
+            ErrorCode.OUTSTANDING_BALANCE,
+            details={"outstanding_xaf": owed, "currency": "XAF"},
+        )
+
     # Single use. A signed blob proves the server minted it, not that it has
     # only been used once, so the jti is burned here. Done after the checks
     # above so a rejected request does not consume the quote.
@@ -223,6 +243,21 @@ async def create_ride(
         fares.corridor_xaf if payload.mode == "corridor" else fares.exclusive_xaf
     )
 
+    # Re-request the route rather than carrying it in the quote.
+    #
+    # A polyline runs to several kilobytes, and a quote id travels in a request
+    # body on a mobile network, so putting it in the signed blob would make
+    # every booking carry the whole geometry twice. Re-routing here also means
+    # a ride is never created against a route the engine no longer agrees with.
+    #
+    # The fare is *not* recomputed from this. It comes from the distance inside
+    # the signed quote, so a route that changed between quoting and booking
+    # cannot silently reprice what the passenger already agreed to (I2).
+    route = await get_routing_provider().route(
+        (payload.pickup_lat, payload.pickup_lng),
+        (payload.dropoff_lat, payload.dropoff_lng),
+    )
+
     pin = generate_pin()
     ride = Ride(
         passenger_id=passenger.id,
@@ -231,6 +266,18 @@ async def create_ride(
         seats=payload.seats,
         pickup_label=payload.pickup_label,
         dropoff_label=payload.dropoff_label,
+        # Set on the row, not by a follow-up UPDATE. Both geography columns are
+        # NOT NULL, so anything that leaves them unset until after the flush
+        # fails the insert outright. WKT order is (longitude latitude), which
+        # is the reverse of how every other API here takes a coordinate and is
+        # the reason this is written out rather than passed through a tuple.
+        pickup_geom=WKTElement(
+            f"POINT({payload.pickup_lng} {payload.pickup_lat})", srid=4326
+        ),
+        dropoff_geom=WKTElement(
+            f"POINT({payload.dropoff_lng} {payload.dropoff_lat})", srid=4326
+        ),
+        route_polyline=route.polyline,
         quoted_fare_xaf=fare,
         quoted_distance_m=payload.distance_m,
         quoted_duration_s=payload.duration_s,
@@ -242,24 +289,24 @@ async def create_ride(
     session.add(ride)
     await session.flush()
 
-    # Geography columns are set by raw SQL: GeoAlchemy2's WKT element handling
-    # and the async driver disagree about parameter binding here, and the
-    # explicit ST_MakePoint is clearer about which argument is which.
-    await session.execute(
-        text(
-            "UPDATE rides SET "
-            "pickup_geom = ST_MakePoint(:p_lng, :p_lat)::geography, "
-            "dropoff_geom = ST_MakePoint(:d_lng, :d_lat)::geography "
-            "WHERE id = :id"
-        ),
-        {
-            "p_lng": payload.pickup_lng,
-            "p_lat": payload.pickup_lat,
-            "d_lng": payload.dropoff_lng,
-            "d_lat": payload.dropoff_lat,
-            "id": ride.id,
-        },
-    )
+    # Store the route as geometry, not only as an encoded string.
+    #
+    # `route_polyline` is what a client draws; `route_geom` is what Postgres
+    # can answer questions about. Corridor matching asks "does this line pass
+    # near both of these points, in this order", which is an ST_DWithin and an
+    # ST_LineLocatePoint against the GiST index. Decoding polylines in Python
+    # to answer that would mean loading every live route per request.
+    #
+    # Declared in Phase 3 and left null until now because nothing needed a line.
+    if route.polyline:
+        await session.execute(
+            text(
+                "UPDATE rides SET route_geom = ST_SetSRID("
+                "  ST_LineFromEncodedPolyline(:polyline), 4326)::geography "
+                "WHERE id = :id"
+            ),
+            {"polyline": route.polyline, "id": ride.id},
+        )
 
     await record_event(
         session,

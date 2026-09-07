@@ -8,6 +8,13 @@ generated migration then proposes dropping its table.
 
 from app.models.base import Base, TimestampMixin, UuidPkMixin
 from app.models.geo import DriverPresence, Landmark
+from app.models.ride import Ride, RideEvent, RideOffer, RideTrace
+from app.models.safety import (
+    CannedMessage,
+    IncidentReport,
+    LedgerEntry,
+    RideShareToken,
+)
 from app.models.user import (
     Driver,
     KycDocument,
@@ -19,12 +26,20 @@ from app.models.user import (
 
 __all__ = [
     "Base",
+    "CannedMessage",
     "Driver",
     "DriverPresence",
+    "IncidentReport",
     "KycDocument",
     "Landmark",
+    "LedgerEntry",
     "OtpChallenge",
     "RefreshToken",
+    "Ride",
+    "RideEvent",
+    "RideOffer",
+    "RideShareToken",
+    "RideTrace",
     "TimestampMixin",
     "User",
     "UuidPkMixin",
