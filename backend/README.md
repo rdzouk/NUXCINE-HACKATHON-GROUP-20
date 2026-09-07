@@ -1,4 +1,20 @@
-# SMS backend proposal
+# VORA local backend
+
+## Run the local API
+
+```powershell
+cd backend
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
+```
+
+The local API exposes `/health`, `/places/search`, `/places/reverse`, and
+`/rides/quote` for testing the map booking flow. It uses seeded Yaounde
+landmarks and does not require SMS credentials or a database.
+
+The SMS webhook below remains a draft and is not registered by this local app.
 
 Status: DRAFT. This folder is a proposal for the FastAPI backend owner and is not approved for production integration.
 
