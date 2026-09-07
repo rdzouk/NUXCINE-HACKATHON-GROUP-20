@@ -11,6 +11,7 @@ export default function MapBookingPage() {
   const { position } = useGeolocation();
   const [origin, setOrigin] = useState(null);
   const [destination, setDestination] = useState(null);
+  const [map, setMap] = useState(null);
   const { quote, loading, error, fetchQuote } = useRoute();
   const navigate = useNavigate();
 
@@ -22,8 +23,8 @@ export default function MapBookingPage() {
 
   return (
     <main className="app-shell map-shell">
-      <MapView center={position ?? { lat: 3.848, lng: 11.502 }}>
-        <RouteLayer geometry={quote?.geometry} />
+      <MapView center={position ?? { lat: 3.848, lng: 11.502 }} onMapReady={setMap}>
+        {() => <RouteLayer map={map} geometry={quote?.geometry} />}
       </MapView>
 
       <div className="booking-panel">

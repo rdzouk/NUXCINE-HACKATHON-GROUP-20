@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import mapboxgl, { MAP_DEFAULTS } from '../services/mapboxClient';
 
-export default function MapView({ center, children }) {
+export default function MapView({ center, children, onMapReady }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
 
@@ -13,7 +13,8 @@ export default function MapView({ center, children }) {
       center: [center.lng, center.lat],
       zoom: MAP_DEFAULTS.zoom,
     });
+    mapRef.current.on('load', () => onMapReady?.(mapRef.current));
   }, [center]);
 
-  return <div ref={containerRef} style={{ width: '100%', height: '100%' }}>{children}</div>;
+  return <div ref={containerRef} style={{ width: '100%', height: '100%' }}>{children?.(mapRef.current)}</div>;
 }
