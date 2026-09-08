@@ -76,6 +76,7 @@ run "phase 4  live tracking"     "$PY" scripts/tracking_demo.py --base "$BASE"
 run "phase 5  cancellation policy" "$PY" scripts/cancel_matrix.py --base "$BASE"
 run "phase 5  share, sos, messages" "$PY" scripts/safety_smoke.py --base "$BASE"
 run "phase 6  corridor rides"    "$PY" scripts/corridor_flow.py --base "$BASE"
+run "phase 6  ride needs chain"  "$PY" scripts/needs_flow.py --base "$BASE"
 run "phase 7  security audit"    ./scripts/security_audit.sh
 
 # Last, and only against the local stack: it stops containers on purpose.

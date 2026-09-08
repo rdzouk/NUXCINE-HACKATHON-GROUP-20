@@ -80,6 +80,17 @@ CAPABILITIES: list[VehicleCapabilityInfo] = [
         description_en="The driver can help with boarding, alighting and bags.",
     ),
     VehicleCapabilityInfo(
+        key=VehicleCapability.EXTRA_LEGROOM,
+        label_fr="Espace pour les jambes",
+        label_en="Extra legroom",
+        description_fr=(
+            "Le chauffeur avance son siege pour liberer de la place a l'arriere."
+        ),
+        description_en=(
+            "The driver moves their seat forward to free up space in the back."
+        ),
+    ),
+    VehicleCapabilityInfo(
         key=VehicleCapability.GUIDE_ANIMAL,
         label_fr="Animal d'assistance accepte",
         label_en="Assistance animal welcome",
@@ -171,5 +182,8 @@ def required_from_profile(user) -> list[str]:
         VehicleCapability.FRONT_SEAT: user.requires_front_seat,
         VehicleCapability.DRIVER_ASSIST: user.requires_driver_assist,
         VehicleCapability.GUIDE_ANIMAL: user.allows_guide_animal,
+        VehicleCapability.EXTRA_LEGROOM: getattr(
+            user, "requires_extra_legroom", False
+        ),
     }
     return [cap.value for cap, needed in mapping.items() if needed]

@@ -1,5 +1,8 @@
 import { useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import SearchBeacon from '../../shared/components/SearchBeacon';
+import { getLocale } from '../../shared/services/locale';
+import { t } from '../../shared/services/strings';
 import { usePassengerRideSocket } from '../hooks/usePassengerRideSocket';
 import { getActiveRide } from '../services/rideState';
 
@@ -9,6 +12,7 @@ export default function SearchingDriverPage() {
   const activeRide = getActiveRide();
   const rideId = location.state?.rideId ?? activeRide?.id ?? null;
   const { status, error } = usePassengerRideSocket(rideId);
+  const en = getLocale() === 'en';
 
   useEffect(() => {
     if (!rideId) {
@@ -21,12 +25,28 @@ export default function SearchingDriverPage() {
     }
   }, [navigate, rideId, status]);
 
+  // What the server is actually doing, said plainly. Matching widens in rings
+  // and gives up at sixty seconds, so the screen reports which ring it is on
+  // rather than showing an unbounded spinner.
+  const detail = {
+    requested: en ? 'Sending your request' : 'Envoi de votre demande',
+    matching: t('ride.findingNote'),
+    accepted: en ? 'A driver accepted' : 'Un chauffeur a accepte',
+  }[status] ?? t('ride.findingNote');
+
   return (
     <main className="app-shell centered">
-      <div className="pulse-dot" />
-      <h2>Looking for a driver...</h2>
-      <p>Ride status: {status ?? 'matching'}</p>
-      {error ? <p>{error}</p> : <p>This should update automatically when a driver accepts.</p>}
+      <SearchBeacon
+        label={t('ride.finding')}
+        detail={error ? error : detail}
+      />
+      {error ? null : (
+        <p className="section-note">
+          {en
+            ? 'This updates on its own the moment a driver accepts. You do not need to refresh.'
+            : "Cet ecran se met a jour tout seul des qu'un chauffeur accepte. Inutile de rafraichir."}
+        </p>
+      )}
     </main>
   );
 }

@@ -39,3 +39,27 @@ export function completeDriverRide(rideId) {
   });
 }
 
+
+/**
+ * Go on duty at a position, with a declared number of free seats.
+ *
+ * This is what actually makes a driver matchable: the matcher selects from
+ * `driver_presence` joined to online drivers, so a client-side "Available"
+ * flag that never reaches the server means the driver waits for offers that
+ * are never sent to them.
+ */
+export function goOnline({ lat, lng, seatsFree = 4 }) {
+  return apiFetch('/driver/online', {
+    method: 'POST',
+    body: JSON.stringify({ lat, lng, seats_free: seatsFree }),
+  });
+}
+
+export function goOffline() {
+  return apiFetch('/driver/offline', { method: 'POST' });
+}
+
+/** The driver's own profile, including KYC state. */
+export function getDriverStatus() {
+  return apiFetch('/driver/kyc');
+}

@@ -295,7 +295,7 @@ def main() -> int:
     if stale:
         print(f"{DIM}  retired corridor rides left live by an earlier run{RESET}")
 
-    check("three passengers, one four-seat vehicle, one bystander", True)
+    check("two bookings, a third that must be refused, and a bystander", True)
     print()
 
     # ------------------------------------------------- leg 1: passenger A --
@@ -427,42 +427,57 @@ def main() -> int:
               "aboard never pays for a bad match")
     print()
 
-    # ------------------------------------------------- leg 3: passenger C --
-    print("passenger C joins as the third leg")
+    # --------------------------------------------- the cap: passenger C --
+    # C is a perfect geometric match and is still refused, because the limit
+    # is two bookings, not two seats.
+    #
+    # That is a safety rule rather than a capacity one. The first passenger may
+    # bring whoever they like; a stranger joins as exactly one person, in the
+    # front seat, in the driver's line of sight. Nobody ends up sitting in the
+    # back beside somebody they have never met. A third booking would put two
+    # unrelated strangers behind the driver, and no fare is worth that.
+    print("a third booking is refused, however well it fits")
     c_pick = point_on_route(a_id, C_BOARDS, "Arret Etoa Meki")
     c_drop = point_on_route(a_id, C_ALIGHTS, "Arret Nkolmesseng")
 
     qc = quote(client, base, c, c_pick, c_drop)
-    exclusive_c = qc["fare_xaf"]
     rc = book(client, base, c, qc["quote_id"])
-    if not check("C's ride created (201)", rc.status_code == 201,
+    if not check("C's ride is still created (201)", rc.status_code == 201,
                  f"got {rc.status_code}: {rc.text[:300]}"):
         return summarise()
     c_id = rc.json()["ride"]["id"]
 
-    accc = accept_offer_for(client, base, driver, c_id)
-    check("the driver took a third passenger", accc.status_code == 200,
-          f"got {accc.status_code}: {accc.text[:300]}")
+    c_joined = psql(
+        f"SELECT count(*) FROM corridor_legs WHERE ride_id='{uid(c_id)}'"
+    )
+    check("but C is not added to A's car", int(c_joined or 0) == 0,
+          f"{c_joined} leg(s); the cap is bookings, not seats")
 
-    c_view = client.get(f"{base}/rides/{c_id}", headers=c).json()["ride"]
-    corridor_c = c_view["quoted_fare_xaf"]
+    # Consent was never sought, because the cap is checked first. A driver who
+    # was asked and said no would look the same in the data, and it is not the
+    # same thing.
+    asked = psql(
+        f"SELECT count(*) FROM ride_events WHERE ride_id='{uid(a_id)}' "
+        f"AND event_type='corridor_join_requested'"
+    )
+    check("and the driver was not asked a second time", int(asked or 0) == 1,
+          f"{asked} join request(s) on A's ride")
 
     total_legs = psql(
         f"SELECT count(*) FROM corridor_legs WHERE parent_ride_id='{uid(a_id)}' "
         f"AND state='confirmed'"
     )
-    check("three passengers are aboard one vehicle", int(total_legs or 0) == 3,
-          f"{total_legs} confirmed legs")
+    check("two bookings share the vehicle, never three",
+          int(total_legs or 0) == 2, f"{total_legs} confirmed legs")
     print()
 
     # ------------------------------------------------------- the economics --
     print(f"{BOLD}the economics{RESET}")
-    total = corridor_a + corridor_b + corridor_c
+    total = corridor_a + corridor_b
     print(f"{DIM}  passenger   corridor   exclusive   saves{RESET}")
     for name, paid, alone in (
         ("A", corridor_a, exclusive_a),
         ("B", corridor_b, exclusive_b),
-        ("C", corridor_c, exclusive_c),
     ):
         print(f"{DIM}  {name}        {paid:>8}   {alone:>9}   "
               f"{alone - paid:>5} XAF{RESET}")
@@ -473,18 +488,16 @@ def main() -> int:
           corridor_a < exclusive_a, f"{corridor_a} vs {exclusive_a}")
     check("B pays less than exclusive hire would have cost them",
           corridor_b < exclusive_b, f"{corridor_b} vs {exclusive_b}")
-    check("C pays less than exclusive hire would have cost them",
-          corridor_c < exclusive_c, f"{corridor_c} vs {exclusive_c}")
     check("the driver earns more than one exclusive fare",
           total > exclusive_a, f"{total} vs {exclusive_a} XAF")
     check("every fare is payable in coins",
-          all(f % 50 == 0 for f in (corridor_a, corridor_b, corridor_c)),
-          f"{corridor_a}, {corridor_b}, {corridor_c}")
+          all(f % 50 == 0 for f in (corridor_a, corridor_b)),
+          f"{corridor_a}, {corridor_b}")
     print()
 
     # -------------------------------------------------------- the detour --
     print("the detour cap")
-    for name, ride_id in (("B", b_id), ("C", c_id)):
+    for name, ride_id in (("B", b_id),):
         row = psql_row(
             f"SELECT added_distance_m, added_duration_s FROM corridor_legs "
             f"WHERE ride_id='{uid(ride_id)}'"
@@ -512,8 +525,6 @@ def main() -> int:
           NGOUSSO["label"] not in b_ride_text, "the itinerary leaked")
     check("A's destination appears nowhere in B's ride list",
           NGOUSSO["label"] not in b_list_text)
-    check("C's destination is not in B's payloads either",
-          c_drop["label"] not in b_ride_text and c_drop["label"] not in b_list_text)
     check("no phone number reaches a co-passenger (I3)",
           not re.search(r"\+237\d{6,}", b_ride_text + b_list_text))
     check("B is not told they are sharing at all",
@@ -529,28 +540,8 @@ def main() -> int:
     driver_legs = psql(
         f"SELECT count(*) FROM corridor_legs WHERE parent_ride_id='{uid(a_id)}'"
     )
-    check("the driver's manifest holds every leg", int(driver_legs or 0) == 3,
+    check("the driver's manifest holds every leg", int(driver_legs or 0) == 2,
           "the driver has to know who to collect and where")
-    print()
-
-    # ------------------------------------------------------- the leg cap --
-    print("a fourth passenger is not appended")
-    e_token, _ = login(client, base)
-    e = {"Authorization": f"Bearer {e_token}"}
-    e_pick = point_on_route(a_id, 0.35, "Arret Mvog Ada")
-    e_drop = point_on_route(a_id, 0.85, "Arret Nkoabang")
-    qe = quote(client, base, e, e_pick, e_drop)
-    re_ = book(client, base, e, qe["quote_id"])
-    check("their ride is still created", re_.status_code == 201,
-          f"got {re_.status_code}: {re_.text[:200]}")
-    if re_.status_code == 201:
-        e_id = re_.json()["ride"]["id"]
-        joined = psql(
-            f"SELECT count(*) FROM corridor_legs WHERE ride_id='{uid(e_id)}'"
-        )
-        check("but they are not made a fourth leg", int(joined or 0) == 0,
-              "three legs is the cap; beyond it A's journey stops resembling "
-              "what they booked")
     print()
 
     # --------------------------------------------------- accessibility --
@@ -560,8 +551,8 @@ def main() -> int:
           f"got {caps.status_code}")
     if caps.status_code == 200:
         vocabulary = caps.json()["capabilities"]
-        check("all five capabilities, in both languages",
-              len(vocabulary) == 5
+        check("every capability, in both languages",
+              len(vocabulary) == 6
               and all(v["label_fr"] and v["label_en"] for v in vocabulary))
         wording = " ".join(
             v["description_fr"] + v["description_en"] for v in vocabulary

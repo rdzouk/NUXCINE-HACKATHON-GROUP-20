@@ -4,8 +4,11 @@ import MapView from '../../map/components/MapView';
 import CancelRideDialog from '../components/CancelRideDialog';
 import MessagePicker from '../components/MessagePicker';
 import ShareTrip from '../components/ShareTrip';
+import VoiceGuide from '../../shared/components/VoiceGuide';
 import { usePassengerRideSocket } from '../hooks/usePassengerRideSocket';
 import { getActiveRide } from '../services/rideState';
+import { getLocale } from '../../shared/services/locale';
+import { t } from '../../shared/services/strings';
 import { raiseSos } from '../services/ridesApi';
 
 export default function DriverEnRoutePage() {
@@ -15,6 +18,7 @@ export default function DriverEnRoutePage() {
   const { ride, status, driverLocation, error } = usePassengerRideSocket(rideId);
   const [cancelling, setCancelling] = useState(false);
   const [sosState, setSosState] = useState('');
+  const en = getLocale() === 'en';
 
   useEffect(() => {
     if (!rideId) {
@@ -33,10 +37,13 @@ export default function DriverEnRoutePage() {
 
   const etaMin = ride?.eta_s ? Math.ceil(ride.eta_s / 60) : null;
   const mapCenter = driverLocation ?? ride?.driver_location ?? ride?.pickup ?? { lat: 3.848, lng: 11.502 };
-  const driverName = ride?.driver?.first_name ?? 'Driver';
+  const driverName =
+    ride?.driver?.first_name ?? (en ? 'Driver' : 'Chauffeur');
   const vehicle = ride?.vehicle
     ? `${ride.vehicle.color} ${ride.vehicle.make} ${ride.vehicle.model} - ${ride.vehicle.plate}`
-    : 'Vehicle details pending';
+    : en
+      ? 'Vehicle details pending'
+      : 'Details du vehicule a venir';
 
   const triggerSos = async () => {
     setSosState('sending');
@@ -52,15 +59,26 @@ export default function DriverEnRoutePage() {
     <main className="app-shell map-shell">
       <div className="app-header">
         <div>
-          <p className="eyebrow">Driver on the way</p>
-          <h1>{etaMin ? `${etaMin} min away` : 'Waiting for live ETA'}</h1>
+          <p className="eyebrow">
+            {en ? 'Driver on the way' : 'Chauffeur en route'}
+          </p>
+          <h1>
+            {etaMin
+              ? en ? `${etaMin} min away` : `Dans ${etaMin} min`
+              : en ? 'Waiting for a live ETA' : "En attente de l'heure d'arrivee"}
+          </h1>
         </div>
-        <span className="status">Pickup: {ride?.pickup?.label ?? 'Updating pickup'}</span>
+        <span className="status">
+          {en ? 'Pickup' : 'Depart'}:{' '}
+          {ride?.pickup?.label ?? (en ? 'Updating' : 'Mise a jour')}
+        </span>
       </div>
 
       <div className="map-panel">
         <MapView center={mapCenter} />
       </div>
+
+      <VoiceGuide announcement={ride?.announcement} locale={ride?.locale ?? 'fr'} />
 
       <div className="ride-panel">
         <h3>{driverName}</h3>
@@ -69,12 +87,18 @@ export default function DriverEnRoutePage() {
         {/* The PIN is the whole anti-impersonation mechanism, so it is the
             largest thing on this panel rather than a line of body text. It is
             what a stranger at the kerb cannot know. */}
-        <p className="pin-display" aria-label={`Your pickup PIN is ${ride?.pin ?? 'not ready'}`}>
+        <p className="eyebrow">{t('ride.pinTitle')}</p>
+        <p
+          className="pin-display"
+          aria-label={
+            en
+              ? `Your pickup PIN is ${ride?.pin ?? 'not ready'}`
+              : `Votre code de prise en charge est ${ride?.pin ?? 'indisponible'}`
+          }
+        >
           {ride?.pin ?? '----'}
         </p>
-        <p>Read this 4-digit code aloud to your driver. Do not send it.</p>
-
-        <p>Ride status: {status ?? 'matching'}</p>
+        <p className="section-note">{t('ride.pinNote')}</p>
         {error ? <p className="form-error">{error}</p> : null}
       </div>
 
@@ -88,15 +112,21 @@ export default function DriverEnRoutePage() {
           onClick={triggerSos}
           disabled={sosState === 'sending' || sosState === 'sent'}
         >
-          {sosState === 'sent' ? 'Emergency alert sent' : 'Emergency'}
+          {sosState === 'sent'
+            ? en ? 'Emergency alert sent' : 'Alerte envoyee'
+            : t('ride.emergency')}
         </button>
         {sosState === 'sent' ? (
           <p className="section-note">
-            An evidence snapshot has been sealed. It cannot be altered.
+            {en
+              ? 'An evidence snapshot has been sealed. It cannot be altered.'
+              : "Un instantane de preuve a ete scelle. Il ne peut plus etre modifie."}
           </p>
         ) : null}
         {sosState === 'failed' ? (
-          <p className="form-error">Could not send. Try again.</p>
+          <p className="form-error">
+            {en ? 'Could not send. Try again.' : "Envoi impossible. Reessayez."}
+          </p>
         ) : null}
 
         <button
@@ -104,7 +134,7 @@ export default function DriverEnRoutePage() {
           type="button"
           onClick={() => setCancelling(true)}
         >
-          Cancel ride
+          {t('ride.cancel')}
         </button>
       </section>
 

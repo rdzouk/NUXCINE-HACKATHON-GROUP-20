@@ -1,3 +1,6 @@
+import { getLocale } from '../../shared/services/locale';
+import { t } from '../../shared/services/strings';
+
 /**
  * The quote, with both prices side by side.
  *
@@ -8,7 +11,15 @@
  * an input to price (I2).
  */
 export default function EtaPriceCard({ quote, loading, error, mode = 'exclusive', seats = 1 }) {
-  if (loading) return <div className="eta-card">Calculating route...</div>;
+  const en = getLocale() === 'en';
+
+  if (loading) {
+    return (
+      <div className="eta-card">
+        {en ? 'Calculating route...' : 'Calcul de l\'itineraire...'}
+      </div>
+    );
+  }
   if (error) return <div className="eta-card eta-card--error">{error.message}</div>;
   if (!quote) return null;
 
@@ -18,37 +29,41 @@ export default function EtaPriceCard({ quote, loading, error, mode = 'exclusive'
   return (
     <div className="eta-card">
       <div className="eta-card__row">
-        <span>Distance</span>
+        <span>{en ? 'Distance' : 'Distance'}</span>
         <strong>{quote.distanceKm.toFixed(1)} km</strong>
       </div>
       <div className="eta-card__row">
-        <span>Estimated time</span>
+        <span>{en ? 'Estimated time' : 'Duree estimee'}</span>
         <strong>{Math.round(quote.durationMin)} min</strong>
       </div>
 
       <div className={sharing ? 'eta-card__row' : 'eta-card__row eta-card__row--chosen'}>
-        <span>Exclusive</span>
+        <span>{t('book.exclusive')}</span>
         <strong>{quote.fareXaf.toLocaleString()} FCFA</strong>
       </div>
 
       {quote.corridorFareXaf ? (
         <div className={sharing ? 'eta-card__row eta-card__row--chosen' : 'eta-card__row'}>
-          <span>Shared</span>
-          <strong>{quote.corridorFareXaf.toLocaleString()} FCFA per seat</strong>
+          <span>{t('book.shared')}</span>
+          <strong>
+            {quote.corridorFareXaf.toLocaleString()} FCFA{' '}
+            {en ? 'per seat' : 'par place'}
+          </strong>
         </div>
       ) : null}
 
       {sharing && seats > 1 ? (
         <div className="eta-card__row eta-card__row--total">
-          <span>{seats} seats</span>
+          <span>{seats} {en ? 'seats' : 'places'}</span>
           <strong>{seatTotal.toLocaleString()} FCFA</strong>
         </div>
       ) : null}
 
       {sharing ? (
         <p className="eta-card__note">
-          You pay for the distance you travel. The driver may pick up others
-          along the same route, and is asked before anyone joins.
+          {en
+            ? 'You pay for the distance you travel. The driver may pick up one other booking along the same route, and is asked before anyone joins.'
+            : "Vous payez la distance que vous parcourez. Le chauffeur peut prendre une autre reservation sur le meme trajet, et on lui demande son accord avant."}
         </p>
       ) : null}
     </div>

@@ -180,6 +180,31 @@ async def seed(passenger_count: int, ride_count: int) -> tuple[int, int]:
                     f"lost their driver"
                 )
 
+        # Settle whatever the demo passengers owe.
+        #
+        # An unsettled cancellation fee blocks the next booking, deliberately:
+        # that is what makes a fee real in a cash market. It also means a
+        # harness or a rehearsal that cancels a ride leaves the documented demo
+        # account unable to book, and the next person to open the README finds
+        # a dead end where the main flow should be.
+        #
+        # Settled, not deleted. `ledger_entries` is append-only in spirit, and
+        # a settlement is a fact worth keeping: the fee was charged and then
+        # cleared, which is exactly what would happen if it were paid.
+        #
+        # Before the early return below, because a rerun that adds no rides is
+        # exactly the case where somebody is trying to fix a stuck demo.
+        cleared = await session.execute(
+            text(
+                "UPDATE ledger_entries SET settled_at = now() "
+                "WHERE settled_at IS NULL AND amount_xaf < 0 AND user_id IN ("
+                "  SELECT id FROM users WHERE phone_e164 LIKE :prefix || '%')"
+            ),
+            {"prefix": SEED_PREFIX},
+        )
+        if cleared.rowcount:
+            print(f"settled {cleared.rowcount} outstanding fee(s) so the demo can book")
+
         # Only make up the difference. Running this twice must leave the same
         # system, and with no delete the only way to do that is to count first.
         already = await session.scalar(

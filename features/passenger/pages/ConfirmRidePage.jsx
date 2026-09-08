@@ -1,5 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import PageHeader from '../../shared/components/PageHeader';
+import { apiFetch } from '../../map/services/apiClient';
+import { getLocale } from '../../shared/services/locale';
 import { createRide } from '../services/ridesApi';
 import {
   clearBookingAttempt,
@@ -9,6 +12,20 @@ import {
   setActiveRide,
   setBookingAttempt,
 } from '../services/rideState';
+
+/**
+ * The last screen before a ride exists.
+ *
+ * **The needs the passenger chose are sent from here.** They were collected on
+ * the booking screen, carried this far in `pendingBooking`, and then dropped:
+ * `createRide` never sent them, so the picker was a form that did nothing and
+ * the driver screen that reads them always rendered empty. The whole
+ * accessibility feature was broken in the middle of its own chain.
+ *
+ * They are shown again before confirming rather than only submitted, because
+ * this is a request made of another person and the passenger should see what
+ * they are about to ask for.
+ */
 
 function createIdempotencyKey() {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -21,23 +38,46 @@ function createIdempotencyKey() {
 export default function ConfirmRidePage() {
   const location = useLocation();
   const navigate = useNavigate();
+  const locale = getLocale();
+  const en = locale === 'en';
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [hintMessage, setHintMessage] = useState('');
+  const [catalogue, setCatalogue] = useState([]);
 
   const pendingBooking = useMemo(() => {
     return location.state?.pendingBooking ?? getPendingBooking();
   }, [location.state]);
 
+  const needs = pendingBooking?.needs ?? [];
+  const needsNote = pendingBooking?.needsNote ?? '';
+
+  useEffect(() => {
+    if (needs.length === 0) return;
+    apiFetch('/ride-needs')
+      .then((data) => setCatalogue(data.needs ?? []))
+      .catch(() => setCatalogue([]));
+  }, [needs.length]);
+
+  const chosen = catalogue
+    .filter((n) => needs.includes(n.key))
+    .map((n) => (en ? n.label_en : n.label_fr));
+
   const handleConfirmRide = async () => {
     if (!pendingBooking?.quote?.quoteId) {
-      setErrorMessage('This quote is missing. Please go back and request a new one.');
+      setErrorMessage(
+        en
+          ? 'This quote is missing. Go back and request a new one.'
+          : 'Ce tarif est introuvable. Revenez en arriere et demandez-en un nouveau.',
+      );
       return;
     }
 
     const previousAttempt = getBookingAttempt();
     const shouldReuseKey = previousAttempt?.quoteId === pendingBooking.quote.quoteId;
-    const idempotencyKey = shouldReuseKey ? previousAttempt.idempotencyKey : createIdempotencyKey();
+    const idempotencyKey = shouldReuseKey
+      ? previousAttempt.idempotencyKey
+      : createIdempotencyKey();
 
     setBookingAttempt({ quoteId: pendingBooking.quote.quoteId, idempotencyKey });
     setLoading(true);
@@ -49,6 +89,8 @@ export default function ConfirmRidePage() {
         quoteId: pendingBooking.quote.quoteId,
         seats: pendingBooking.seats,
         idempotencyKey,
+        rideNeeds: needs,
+        needsNote,
       });
 
       setActiveRide(response.ride);
@@ -58,61 +100,120 @@ export default function ConfirmRidePage() {
     } catch (error) {
       setErrorMessage(error.message);
 
-      switch (error.code) {
-        case 'QUOTE_ALREADY_USED':
-          setHintMessage('This quote has already been used. Request a new quote to continue.');
-          break;
-        case 'QUOTE_EXPIRED':
-          setHintMessage('This quote has expired. Go back and request a new quote.');
-          break;
-        case 'OUTSTANDING_BALANCE':
-          setHintMessage('Your account has an outstanding balance that must be settled before booking.');
-          break;
-        case 'NO_DRIVERS_AVAILABLE':
-          setHintMessage('No drivers are currently available nearby. Please try again shortly.');
-          break;
-        default:
-          setHintMessage('You can retry this booking with the same request key.');
-      }
+      // The hint is the recovery, not a restatement of the error. The API has
+      // already said what went wrong, in the right language.
+      const hints = {
+        QUOTE_ALREADY_USED: en
+          ? 'Request a new quote to continue.'
+          : 'Demandez un nouveau tarif pour continuer.',
+        QUOTE_EXPIRED: en
+          ? 'Go back and request a new quote.'
+          : 'Revenez en arriere et demandez un nouveau tarif.',
+        OUTSTANDING_BALANCE: en
+          ? 'Settle what you owe with your driver, then book again.'
+          : 'Reglez ce que vous devez avec votre chauffeur, puis reservez a nouveau.',
+        NO_DRIVERS_AVAILABLE: en
+          ? 'No driver is free nearby right now. Try again shortly.'
+          : "Aucun chauffeur n'est libre a proximite. Reessayez dans un instant.",
+      };
+
+      setHintMessage(
+        hints[error.code] ??
+          (en
+            ? 'You can retry this booking with the same request key.'
+            : 'Vous pouvez reessayer cette reservation avec la meme cle.'),
+      );
     } finally {
       setLoading(false);
     }
   };
 
+  if (!pendingBooking) {
+    return (
+      <main className="app-shell">
+        <PageHeader
+          title={en ? 'Confirm your ride' : 'Confirmez votre course'}
+          fallback="/passenger/book"
+        />
+        <p className="section-note">
+          {en
+            ? 'No quote is available. Go back and request one first.'
+            : "Aucun tarif disponible. Revenez en arriere et demandez-en un d'abord."}
+        </p>
+        <button
+          className="primary-button"
+          onClick={() => navigate('/passenger/book')}
+        >
+          {en ? 'Back to the map' : 'Retour a la carte'}
+        </button>
+      </main>
+    );
+  }
+
   return (
     <main className="app-shell">
-      <h1>Confirm your ride</h1>
-      {pendingBooking ? (
+      <PageHeader
+        eyebrow={en ? 'Almost there' : 'Presque fini'}
+        title={en ? 'Confirm your ride' : 'Confirmez votre course'}
+        fallback="/passenger/book"
+      />
+
+      <p className="eyebrow">{en ? 'Route' : 'Trajet'}</p>
+
+      <div className="fact-row">
+        <span>{en ? 'From' : 'Depart'}</span>
+        <strong>
+          {pendingBooking.pickup.name ?? pendingBooking.pickup.label ?? '-'}
+        </strong>
+      </div>
+      <div className="fact-row">
+        <span>{en ? 'To' : 'Arrivee'}</span>
+        <strong>
+          {pendingBooking.dropoff.name ?? pendingBooking.dropoff.label ?? '-'}
+        </strong>
+      </div>
+      <div className="fact-row">
+        <span>{en ? 'Distance' : 'Distance'}</span>
+        <strong>
+          {pendingBooking.quote.distanceKm.toFixed(1)} km,{' '}
+          {Math.round(pendingBooking.quote.durationMin)} min
+        </strong>
+      </div>
+      <div className="fact-row">
+        <span>{en ? 'Seats' : 'Places'}</span>
+        <strong>{pendingBooking.seats}</strong>
+      </div>
+      <div className="fact-row">
+        <span>{en ? 'Fare' : 'Tarif'}</span>
+        <strong>{pendingBooking.quote.fareXaf.toLocaleString()} FCFA</strong>
+      </div>
+
+      {chosen.length > 0 || needsNote ? (
         <>
-          <div className="ride-summary">
-            <p><strong>From:</strong> {pendingBooking.pickup.name ?? pendingBooking.pickup.label ?? 'Pickup point'}</p>
-            <p><strong>To:</strong> {pendingBooking.dropoff.name ?? pendingBooking.dropoff.label ?? 'Drop-off point'}</p>
-            <p>
-              <strong>Distance:</strong> {pendingBooking.quote.distanceKm.toFixed(1)} km
-              {' '}·{' '}
-              {Math.round(pendingBooking.quote.durationMin)} min
-            </p>
-            <p><strong>Fare:</strong> {pendingBooking.quote.fareXaf.toLocaleString()} FCFA</p>
-          </div>
-          {errorMessage ? <p>{errorMessage}</p> : null}
-          {hintMessage ? <p>{hintMessage}</p> : null}
-          <div className="button-row">
-            <button className="secondary-button" onClick={() => navigate('/passenger/book')} disabled={loading}>
-              Back
-            </button>
-            <button className="primary-button" onClick={handleConfirmRide} disabled={loading}>
-              {loading ? 'Confirming...' : 'Confirm ride'}
-            </button>
-          </div>
+          <p className="eyebrow">
+            {en ? 'You are asking the driver for' : 'Vous demandez au chauffeur'}
+          </p>
+          <ul className="driver-needs">
+            {chosen.map((label) => (
+              <li key={label}>{label}</li>
+            ))}
+          </ul>
+          {needsNote ? <p className="driver-needs__note">{needsNote}</p> : null}
         </>
-      ) : (
-        <>
-          <p>No quote is available. Please go back and request a quote first.</p>
-          <button className="primary-button" onClick={() => navigate('/passenger/book')}>
-            Back to map
-          </button>
-        </>
-      )}
+      ) : null}
+
+      {errorMessage ? <p className="form-error">{errorMessage}</p> : null}
+      {hintMessage ? <p className="section-note">{hintMessage}</p> : null}
+
+      <button
+        className="primary-button"
+        onClick={handleConfirmRide}
+        disabled={loading}
+      >
+        {loading
+          ? en ? 'Confirming...' : 'Confirmation...'
+          : en ? 'Confirm ride' : 'Confirmer la course'}
+      </button>
     </main>
   );
 }

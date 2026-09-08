@@ -157,10 +157,18 @@ def make_driver(user_id: str, lat: float, lng: float) -> str:
         f"VALUES ('{uid(driver_id)}', 'CE-{uuid.uuid4().hex[:5].upper()}', "
         f"'Toyota', 'Corolla', 'blanc', 4)"
     )
+    # Upsert, because the driver may already have a presence row: going online
+    # through the API writes one, and this harness plants its own. A plain
+    # INSERT collided on the primary key and killed the run during setup, with
+    # the failure looking like a concurrency bug rather than a fixture one.
     psql(
         f"INSERT INTO driver_presence (driver_id, geom, recorded_at) "
         f"VALUES ('{uid(driver_id)}', "
-        f"ST_MakePoint({lng}, {lat})::geography, now())"
+        f"ST_MakePoint({lng}, {lat})::geography, now()) "
+        f"ON CONFLICT (driver_id) DO UPDATE SET "
+        f"  geom = EXCLUDED.geom, "
+        f"  recorded_at = EXCLUDED.recorded_at, "
+        f"  is_stale = false"
     )
     return driver_id
 

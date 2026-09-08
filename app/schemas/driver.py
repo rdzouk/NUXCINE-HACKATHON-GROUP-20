@@ -22,6 +22,7 @@ from app.schemas.common import (
     Longitude,
     NamedPlace,
     RideMode,
+    RideNeed,
     VehicleCapability,
     VoraModel,
 )
@@ -57,6 +58,15 @@ class RideOffer(VoraModel):
     fare_xaf: int = Field(description="What the driver would earn on this trip.")
     currency: str = "XAF"
     accessibility_required: list[VehicleCapability] = Field(default_factory=list)
+    ride_needs: list[RideNeed] = Field(
+        default_factory=list,
+        description=(
+            "What the driver is being asked to do, shown before they accept. "
+            "Actions only: nothing here says anything about the passenger, "
+            "because nothing about them was recorded (I9)."
+        ),
+    )
+    ride_needs_note: str | None = Field(default=None, max_length=140)
     wave: int = Field(ge=1, le=3, description="Matching wave that produced this offer.")
     expires_at: datetime
     created_at: datetime
@@ -178,3 +188,42 @@ class DriverAdminView(VoraModel):
     is_online: bool
     reviewed_at: datetime | None = None
     rejection_reason: str | None = None
+
+
+class RideNeedInfo(VoraModel):
+    """One thing a passenger can ask for, and what the driver does about it.
+
+    A need, never a diagnosis. Every entry describes an action the driver
+    takes; none records anything about the person asking. Somebody tall,
+    somebody who gets carsick and somebody with a mobility impairment select
+    the same option and the system cannot tell them apart, which is what
+    keeps this the right side of Law 2024/017 (I9).
+    """
+
+    key: str
+    label_fr: str
+    label_en: str
+    driver_action_fr: str
+    driver_action_en: str
+    requires_undertaking: bool = Field(
+        description=(
+            "Whether a driver must have signed the undertakings before being "
+            "offered a ride carrying this need. True for anything the driver "
+            "does rather than anything the car has."
+        )
+    )
+    vehicle_capability: str | None = Field(
+        default=None,
+        description=(
+            "The vehicle capability this implies, if any. Most needs imply "
+            "none: keeping the windows closed is behaviour, not a property of "
+            "the car, so it must not shrink the pool of vehicles."
+        ),
+    )
+
+
+class RideNeedsResponse(VoraModel):
+    needs: list[RideNeedInfo]
+    undertakings_fr: list[str]
+    undertakings_en: list[str]
+    undertakings_version: str

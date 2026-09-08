@@ -9,3 +9,14 @@ createRoot(document.getElementById('root')).render(
     <App />
   </StrictMode>
 );
+// Register the service worker so the app installs and opens offline.
+//
+// After load, never before: registration competes with the first render for
+// the same connection, and on a slow network that trade is the wrong way
+// round. Failure is ignored on purpose, because a missing worker costs
+// installability, not function.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}

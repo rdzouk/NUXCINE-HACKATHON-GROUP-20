@@ -1,15 +1,28 @@
 import { apiFetch } from '../../map/services/apiClient';
 
-export function createRide({ quoteId, seats, idempotencyKey }) {
+/**
+ * Book the ride the signed quote describes.
+ *
+ * The needs list travels here rather than on the profile because a need
+ * belongs to the journey: somebody travelling with luggage today needs boot
+ * space today and not tomorrow. Sending an empty list is meaningful, and makes the
+ * server fall back to the passenger's standing defaults.
+ *
+ * Nothing in it says why anything was asked for. Every value names something
+ * the driver does, so no health data is transmitted or stored (I9).
+ */
+export function createRide({ quoteId, seats, idempotencyKey, rideNeeds, needsNote }) {
   return apiFetch('/rides', {
-	method: 'POST',
-	headers: {
-	  'Idempotency-Key': idempotencyKey,
-	},
-	body: JSON.stringify({
-	  quote_id: quoteId,
-	  seats,
-	}),
+    method: 'POST',
+    headers: {
+      'Idempotency-Key': idempotencyKey,
+    },
+    body: JSON.stringify({
+      quote_id: quoteId,
+      seats,
+      ride_needs: rideNeeds ?? [],
+      ride_needs_note: needsNote || null,
+    }),
   });
 }
 

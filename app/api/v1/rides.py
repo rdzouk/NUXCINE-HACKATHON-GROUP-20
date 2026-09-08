@@ -207,6 +207,13 @@ async def create_ride(
     if not required:
         required = accessibility.required_from_profile(user)
 
+    # Needs are what the driver is asked to do; capabilities are what the car
+    # has to be. They are kept apart deliberately, because conflating them
+    # would let "keep the windows closed" shrink the pool of vehicles.
+    needs = [n.value for n in payload.ride_needs]
+    if not needs:
+        needs = list(user.default_ride_needs or [])
+
     ride, created = await ride_service.create_ride(
         session,
         get_redis(),
@@ -214,6 +221,8 @@ async def create_ride(
         quote_id=payload.quote_id,
         seats=payload.seats,
         accessibility_required=required,
+        ride_needs=needs,
+        ride_needs_note=payload.ride_needs_note,
         idempotency_key=idempotency_key,
     )
 

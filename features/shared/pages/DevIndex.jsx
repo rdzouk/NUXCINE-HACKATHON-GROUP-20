@@ -26,7 +26,7 @@ const links = [
 export default function DevIndex() {
   return (
     <div style={{ padding: 24, fontFamily: 'sans-serif' }}>
-      <h1>VORA — screen index (dev only)</h1>
+      <h1>VORA screen index (dev only)</h1>
       {links.map(({ section, pages }) => (
         <div key={section}>
           <h3>{section}</h3>

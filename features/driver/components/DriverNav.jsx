@@ -1,18 +1,23 @@
 import { Link, useLocation } from 'react-router-dom';
+import { getLocale } from '../../shared/services/locale';
 
-const tabs = [
-  ['Dashboard', '/driver/dashboard'],
-  ['Earnings', '/driver/earnings'],
-  ['History', '/driver/history'],
-  ['Profile', '/driver/profile'],
+const TABS = [
+  ['/driver/dashboard', 'Dashboard', 'Tableau de bord'],
+  ['/driver/earnings', 'Earnings', 'Gains'],
+  ['/driver/history', 'History', 'Historique'],
+  ['/driver/profile', 'Profile', 'Profil'],
 ];
 
 export default function DriverNav() {
   const { pathname } = useLocation();
+  const en = getLocale() === 'en';
+
   return (
     <nav className="bottom-nav">
-      {tabs.map(([label, path]) => (
-        <Link key={path} to={path} className={pathname === path ? 'active' : ''}>{label}</Link>
+      {TABS.map(([path, labelEn, labelFr]) => (
+        <Link key={path} to={path} className={pathname === path ? 'active' : ''}>
+          {en ? labelEn : labelFr}
+        </Link>
       ))}
     </nav>
   );

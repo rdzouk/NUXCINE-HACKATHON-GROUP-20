@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { completeDriverRide, getDriverRide, startDriverRide } from '../services/driverApi';
 import { getActiveDriverRide, setActiveDriverRide, setCompletedDriverRide } from '../services/driverState';
+import OtpInput from '../../auth/components/OtpInput';
+import RideInstructions from '../components/RideInstructions';
 
 export default function RideInProgressPage() {
   const location = useLocation();
@@ -67,16 +69,18 @@ export default function RideInProgressPage() {
 
   return (
     <main className="app-shell centered">
+      {/* Shown before the trip starts, not after, because most of these have
+          to be done before the passenger gets in: the seat moved, the windows
+          up, the temperature set. */}
+      <RideInstructions ride={fallbackRide} />
+
       {!started ? (
         <>
           <h2>Enter passenger PIN to start</h2>
-          <input
-            value={pin}
-            onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
-            maxLength={4}
-            placeholder="4-digit PIN"
-            inputMode="numeric"
-          />
+          <p className="section-note">
+            Ask the passenger to read you their four-digit code.
+          </p>
+          <OtpInput value={pin} onChange={setPin} length={4} disabled={isSubmitting} />
           <button className="primary-button" onClick={handleStartRide} disabled={isSubmitting || pin.length !== 4 || !rideId}>
             {isSubmitting ? 'Starting...' : 'Start ride'}
           </button>

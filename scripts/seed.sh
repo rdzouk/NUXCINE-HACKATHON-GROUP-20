@@ -81,6 +81,12 @@ in_api python scripts/seed_drivers.py --count "$DRIVERS"
 step "passengers and ride history"
 in_api python scripts/seed_history.py --passengers "$PASSENGERS" --rides "$RIDES"
 
+# ------------------------------------------------------------- admin ----
+# The dashboard is unreachable without one, and promoting an account by hand in
+# psql is not something a juror following the README will do.
+step administrator
+in_api python scripts/seed_admin.py
+
 # ------------------------------------------------------------ report ----
 step "what is now in the database"
 docker compose exec -T postgres psql -U vora -d vora -tAc "
@@ -89,6 +95,7 @@ UNION ALL SELECT 'drivers online   ' || count(*) FROM drivers WHERE is_online
 UNION ALL SELECT 'vehicles         ' || count(*) FROM vehicles
 UNION ALL SELECT 'with a ramp      ' || count(*) FROM vehicles WHERE has_ramp
 UNION ALL SELECT 'passengers       ' || count(*) FROM users WHERE role = 'passenger'
+UNION ALL SELECT 'admins           ' || count(*) FROM users WHERE role = 'admin'
 UNION ALL SELECT 'completed rides  ' || count(*) FROM rides WHERE status = 'completed'
 " | sed 's/^/  /'
 

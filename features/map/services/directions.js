@@ -1,8 +1,8 @@
 import { apiFetch } from './apiClient';
 import { decodePolyline } from '../utils/polyline';
 
-// Replaces Mapbox Directions. Fare is computed server-side here — never
-// trust or recompute a price on the client (contract invariant I2).
+// Replaces Mapbox Directions. Fare is computed server-side here. Never trust
+// or recompute a price on the client (contract invariant I2).
 export async function getQuote(pickup, dropoff, seats = 1, mode = 'exclusive') {
   const data = await apiFetch('/rides/quote', {
     method: 'POST',

@@ -93,10 +93,75 @@ class NullSmsSender(SmsSender):
 _sender: SmsSender | None = None
 
 
+class RoutingSmsSender(SmsSender):
+    """Real SMS to real handsets, console for the reserved test numbers.
+
+    Turning on a real gateway must not lock the seeded accounts out. A test
+    number has no handset behind it, so sending it an SMS delivers nothing and
+    the code becomes unreadable: the demo passengers and the entire seeded
+    fleet stop being able to log in the moment credentials are configured.
+
+    Routing on the number rather than on an environment flag keeps both true at
+    once. A real phone gets a real message; +23760000000xxxx keeps logging to
+    the console, where the dev endpoint can read it back.
+
+    The split is the same one `normalise_phone` already makes, so there is one
+    definition of "test number" rather than two that can drift.
+    """
+
+    def __init__(self, real: SmsSender, console: ConsoleSmsSender) -> None:
+        self._real = real
+        self._console = console
+
+    def _is_test_number(self, phone_e164: str) -> bool:
+        prefix = settings.test_number_prefix
+        return bool(
+            settings.allow_test_numbers
+            and prefix
+            and phone_e164.startswith(prefix)
+        )
+
+    async def send_otp(self, phone_e164: str, code: str) -> None:
+        if self._is_test_number(phone_e164):
+            await self._console.send_otp(phone_e164, code)
+            return
+        await self._real.send_otp(phone_e164, code)
+
+    def peek(self, phone_e164: str) -> str | None:
+        """Read back a console-delivered code, for the dev endpoint."""
+        return self._console.peek(phone_e164)
+
+
 def get_sms_sender() -> SmsSender:
+    """The active sender.
+
+    Real delivery when credentials are configured, the console otherwise, and
+    both at once when a real gateway is wired: see RoutingSmsSender.
+
+    Chosen by whether the credentials exist rather than by an environment flag,
+    because a flag can say "production" while the credentials are absent, and
+    the failure mode there is an app that believes it sent an SMS.
+    """
     global _sender
+
     if _sender is None:
-        _sender = ConsoleSmsSender()
+        if settings.httpsms_api_key and settings.httpsms_from_number:
+            from app.services.sms_httpsms import HttpSmsSender
+
+            _sender = RoutingSmsSender(HttpSmsSender(), ConsoleSmsSender())
+            logger.info(
+                "sms_sender_selected",
+                sender="httpsms",
+                note="test numbers still log to the console",
+            )
+        else:
+            _sender = ConsoleSmsSender()
+            logger.info(
+                "sms_sender_selected",
+                sender="console",
+                note="no HTTPSMS credentials; codes are logged, not sent",
+            )
+
     return _sender
 
 

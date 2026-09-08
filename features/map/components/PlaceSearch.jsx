@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { searchPlaces } from '../services/geocoding';
 import { haversineKm } from '../utils/distance';
+import { getLocale } from '../../shared/services/locale';
+import { t } from '../../shared/services/strings';
 
 /**
  * How the match was made, in words a passenger would use.
@@ -11,13 +13,21 @@ import { haversineKm } from '../utils/distance';
  * people here navigate by landmark, and a street-address geocoder cannot.
  */
 const MATCH_LABELS = {
-  exact_alias: 'Exact match',
-  fuzzy_landmark: 'Close match',
-  quartier: 'Quartier',
-  street_fallback: 'Street',
+  en: {
+    exact_alias: 'Exact match',
+    fuzzy_landmark: 'Close match',
+    quartier: 'Quartier',
+    street_fallback: 'Street',
+  },
+  fr: {
+    exact_alias: 'Correspondance exacte',
+    fuzzy_landmark: 'Correspondance approchee',
+    quartier: 'Quartier',
+    street_fallback: 'Rue',
+  },
 };
 
-export default function PlaceSearch({ label, defaultValue, near, onSelect }) {
+export default function PlaceSearch({ label, defaultValue, near, onSelect, hint }) {
   const [query, setQuery] = useState(defaultValue?.name ?? '');
   const [results, setResults] = useState([]);
   const [errorMessage, setErrorMessage] = useState('');
@@ -65,11 +75,13 @@ export default function PlaceSearch({ label, defaultValue, near, onSelect }) {
         id={`search-${label}`}
         value={query}
         onChange={handleChange}
-        placeholder={label === 'Destination' ? 'Try warda, or mokolo' : label}
+        placeholder={hint ?? label}
         autoComplete="off"
       />
 
-      {searching ? <p className="place-search__hint">Searching...</p> : null}
+      {searching ? (
+        <p className="place-search__hint">{t('book.searching')}</p>
+      ) : null}
 
       {results.length > 0 && (
         <ul className="place-results">
@@ -87,7 +99,7 @@ export default function PlaceSearch({ label, defaultValue, near, onSelect }) {
                         colour says nothing to a screen reader or to anyone who
                         cannot distinguish the two. */}
                     <span className="place-results__match">
-                      {MATCH_LABELS[r.matchType] ?? r.matchType}
+                      {MATCH_LABELS[getLocale()]?.[r.matchType] ?? r.matchType}
                     </span>
                   </span>
                 </button>

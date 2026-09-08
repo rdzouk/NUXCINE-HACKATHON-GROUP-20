@@ -134,18 +134,22 @@ def test_announcement_survives_missing_details():
     "distance_m,duration_s",
     [(2_000, 400), (5_000, 900), (9_000, 1_600), (14_000, 2_400)],
 )
-def test_three_corridor_seats_beat_one_exclusive_fare(distance_m, duration_s):
+def test_two_corridor_seats_beat_one_exclusive_fare(distance_m, duration_s):
     """The economic proposition, and the sentence said to a jury.
 
-    Riders pay less each and the driver earns more, because the vehicle is not
-    being sold to one person. If this ever inverts, corridor is a worse deal
-    for the driver and they will simply refuse it.
+    Both riders pay less than exclusive hire and the driver still earns more
+    than one exclusive fare, because the vehicle is not being sold to one
+    person. Two seats, not three: the cap is two passengers for safety, so the
+    economics have to hold at two or the offer collapses.
+
+    If this ever inverts, corridor is a worse deal for the driver and they
+    will simply refuse it.
     """
     exclusive = compute_exclusive_fare(distance_m, duration_s, DEFAULT_FARE_CONFIG)
     seat = compute_corridor_fare(distance_m, duration_s, DEFAULT_FARE_CONFIG)
 
     assert seat < exclusive, "a seat must cost less than the whole vehicle"
-    assert seat * 3 > exclusive, "three seats must beat one exclusive fare"
+    assert seat * 2 > exclusive, "two seats must beat one exclusive fare"
 
 
 def test_a_corridor_seat_is_cheaper_at_every_length():
@@ -170,10 +174,38 @@ def test_the_detour_cap_is_tight_enough_to_matter():
     assert 0 < MAX_DETOUR_SECONDS <= 300
 
 
-def test_legs_are_capped_at_three():
-    """Beyond three the first passenger's journey stops resembling what they
-    booked, and the routing stops being solvable in the time a driver waits."""
-    assert MAX_LEGS == 3
+def test_only_one_booking_may_join():
+    """Two bookings to a vehicle, never three.
+
+    Bookings, not people. The first passenger may bring friends: one booking,
+    people who already know each other. What is capped is how many separate
+    strangers the platform introduces into one car, and that is one.
+    """
+    assert MAX_LEGS == 2
+
+
+def test_a_joiner_travels_alone():
+    """One seat, not a party.
+
+    The first passenger agreed to share with a stranger. Letting that stranger
+    bring three of their own would leave the original passenger alone in a car
+    with a group, which is the situation the cap exists to prevent.
+    """
+    from app.services.corridor import MAX_JOINER_SEATS
+
+    assert MAX_JOINER_SEATS == 1
+
+
+def test_the_joiner_requires_a_free_front_seat():
+    """So nobody sits beside a stranger in the back.
+
+    Modelled as a vehicle capability, which is the only way it may be
+    modelled: it is a fact about the car, never about either passenger (I9).
+    """
+    from app.services.corridor import JOINER_SEAT_REQUIREMENT
+
+    assert JOINER_SEAT_REQUIREMENT == "front_seat"
+    assert JOINER_SEAT_REQUIREMENT in {c.value for c in VehicleCapability}
 
 
 # --------------------------------------------------------------- payments --

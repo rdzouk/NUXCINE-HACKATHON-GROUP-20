@@ -40,6 +40,7 @@ from sqlalchemy import (
     Index,
     Integer,
     SmallInteger,
+    String,
     Text,
     UniqueConstraint,
     text,
@@ -139,6 +140,21 @@ class Ride(UuidPkMixin, TimestampMixin, Base):
     accessibility_required: Mapped[list[str]] = mapped_column(
         ARRAY(Text), nullable=False, server_default=text("'{}'::text[]")
     )
+
+    # What the passenger asked the driver to do, carried per ride rather than
+    # per person because a need changes trip to trip: somebody travelling with
+    # luggage today needs boot space today.
+    #
+    # Never a diagnosis. Every value is an action the driver takes, and the
+    # same value is chosen for entirely different reasons, so nothing here is
+    # health data under Law 2024/017 (I9).
+    ride_needs: Mapped[list[str]] = mapped_column(
+        ARRAY(Text), nullable=False, server_default=text("'{}'::text[]")
+    )
+    # Free text for "something else". Capped at 140 by the column: it reaches
+    # another person, so it has to be short enough to read at a glance and too
+    # short to carry an address or a phone number.
+    ride_needs_note: Mapped[str | None] = mapped_column(String(140))
 
     # The PIN is stored twice on purpose.
     #

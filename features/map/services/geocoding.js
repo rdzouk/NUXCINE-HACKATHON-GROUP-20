@@ -1,7 +1,7 @@
 import { apiFetch } from './apiClient';
 
-// Replaces Mapbox Geocoding with the landmark gazetteer — this is the
-// plan's actual innovation bet, so this call matters more than it looks.
+// Replaces Mapbox Geocoding with the landmark gazetteer. This is the plan's
+// actual innovation bet, so this call matters more than it looks.
 export async function searchPlaces(query, near) {
   const params = new URLSearchParams({ q: query, limit: '8' });
   if (near) params.set('near', `${near.lat},${near.lng}`);

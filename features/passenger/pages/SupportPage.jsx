@@ -1,9 +1,10 @@
 import { Link } from 'react-router-dom';
+import PageHeader from '../../shared/components/PageHeader';
 
 export default function SupportPage() {
   return (
     <main className="app-shell">
-      <h1>Support</h1>
+      <PageHeader title="Support" fallback="/passenger/home" />
       <p>Need help with a ride? Contact us:</p>
       <ul>
         <li>📞 Call assistance: +237 6XX XXX XXX</li>

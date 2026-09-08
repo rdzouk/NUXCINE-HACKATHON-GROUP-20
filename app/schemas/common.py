@@ -69,6 +69,34 @@ class VehicleCapability(StrEnum):
     FRONT_SEAT = "front_seat"
     DRIVER_ASSIST = "driver_assist"
     GUIDE_ANIMAL = "guide_animal"
+    # Room, not a reason. A passenger says the car needs space; why they
+    # need it is never asked and never stored. Somebody tall benefits
+    # identically, which is the sign the model is right.
+    EXTRA_LEGROOM = "extra_legroom"
+
+
+class RideNeed(StrEnum):
+    """Something the passenger asks the driver to do on this trip.
+
+    A need, never a diagnosis (I9). Every member below names an action the
+    driver takes. Somebody tall, somebody who gets carsick and somebody with a
+    mobility impairment choose the same value and the system cannot tell them
+    apart, which is precisely what keeps this outside the health data Law
+    2024/017 prohibits processing.
+
+    Distinct from `VehicleCapability`: that constrains which cars can be
+    matched, this constrains what the driver does once matched. Most needs
+    imply no capability at all, and treating them as capabilities would shrink
+    the pool of vehicles for no reason.
+    """
+
+    EXTRA_LEGROOM = "extra_legroom"
+    CLIMATE_ADJUSTED = "climate_adjusted"
+    WINDOWS_CLOSED = "windows_closed"
+    SPOKEN_ITINERARY = "spoken_itinerary"
+    GUIDED_TOUR = "guided_tour"
+    QUIET_RIDE = "quiet_ride"
+    OTHER = "other"
 
 
 class HealthComponent(VoraModel):

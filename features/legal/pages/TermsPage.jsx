@@ -1,7 +1,8 @@
+import PageHeader from '../../shared/components/PageHeader';
 export default function TermsPage() {
   return (
     <main className="app-shell legal-page">
-      <h1>Terms & Conditions</h1>
+      <PageHeader title="Terms" fallback="/passenger/profile" />
       <p className="eyebrow">Last updated: September 2026</p>
 
       <h3>What VORA is</h3>

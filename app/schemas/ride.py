@@ -24,7 +24,13 @@ from uuid import UUID
 
 from pydantic import Field
 
-from app.schemas.common import NamedPlace, RideMode, VehicleCapability, VoraModel
+from app.schemas.common import (
+    NamedPlace,
+    RideMode,
+    RideNeed,
+    VehicleCapability,
+    VoraModel,
+)
 
 
 class RideStatus(StrEnum):
@@ -189,6 +195,21 @@ class Ride(VoraModel):
         description="Per-trip vehicle requirements. Defaults from the passenger profile.",
     )
 
+    ride_needs: list[RideNeed] = Field(
+        default_factory=list,
+        description=(
+            "What the passenger asked the driver to do on this trip. Returned "
+            "to both parties: the passenger to confirm what they asked for, "
+            "the driver because they cannot do it otherwise. Nothing here "
+            "says why it was asked for (I9)."
+        ),
+    )
+    ride_needs_note: str | None = Field(
+        default=None,
+        max_length=140,
+        description="Free text accompanying 'other'. Capped hard; it reaches another person.",
+    )
+
     pin: str | None = Field(
         default=None,
         description=(
@@ -196,6 +217,20 @@ class Ride(VoraModel):
             "survives an app restart. Always null for the driver and for admins."
         ),
         examples=["4821"],
+    )
+
+    announcement: str | None = Field(
+        default=None,
+        description=(
+            "The current status as one spoken sentence, for a passenger who "
+            "cannot read the screen. Written to be heard rather than read and "
+            "returned by the server so the wording can be corrected without an "
+            "app release, and so the French is written once rather than in "
+            "every client.\n\n"
+            "Null for the driver: it is the passenger's own ride being "
+            "narrated, and the arrival line contains the PIN."
+        ),
+        examples=["Votre chauffeur est arrive. Toyota Corolla de couleur blanc."],
     )
 
     driver: RideDriverSummary | None = Field(
@@ -253,6 +288,24 @@ class RideCreateRequest(VoraModel):
         description=(
             "Overrides the passenger's standing profile for this trip only. "
             "Vehicle capabilities, never a personal attribute (I9)."
+        ),
+    )
+    ride_needs: list[RideNeed] = Field(
+        default_factory=list,
+        max_length=7,
+        description=(
+            "What the driver is asked to do on this trip. A closed vocabulary "
+            "served by GET /ride-needs, so a phrasing correction is a server "
+            "change rather than an app release."
+        ),
+    )
+    ride_needs_note: str | None = Field(
+        default=None,
+        max_length=140,
+        description=(
+            "Accompanies 'other'. Capped at 140 characters because it reaches "
+            "another person: long enough to be useful, too short to hold an "
+            "address."
         ),
     )
 

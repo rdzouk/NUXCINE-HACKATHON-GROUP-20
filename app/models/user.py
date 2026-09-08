@@ -25,6 +25,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import (
+    ARRAY,
     Boolean,
     CheckConstraint,
     DateTime,
@@ -87,8 +88,27 @@ class User(UuidPkMixin, TimestampMixin, Base):
     )
     # A communication preference, not a matching predicate. See the split
     # documented in docs/CONTRACT_DECISIONS.md section 6.
+    requires_extra_legroom: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
+    # Not a capability: it changes how the driver is asked to behave, not which
+    # car is sent, so it must never narrow the vehicle pool.
+    prefers_quiet_ride: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
     prefers_text_contact: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=text("false")
+    )
+
+    # Standing defaults, applied to a booking that states none of its own. A
+    # passenger who needs the itinerary spoken needs it on every trip and
+    # should not have to say so every time.
+    #
+    # The per-ride value still wins, because a need is a property of the
+    # journey: somebody travelling with luggage today needs boot space today
+    # and not tomorrow (I9).
+    default_ride_needs: Mapped[list[str]] = mapped_column(
+        ARRAY(Text), nullable=False, server_default=text("'{}'::text[]")
     )
 
     driver: Mapped[Driver | None] = relationship(
@@ -212,6 +232,9 @@ class Vehicle(UuidPkMixin, TimestampMixin, Base):
         Boolean, nullable=False, server_default=text("true")
     )
     driver_assists: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
+    has_extra_legroom: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=text("false")
     )
     accepts_guide_animal: Mapped[bool] = mapped_column(

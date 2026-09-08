@@ -3817,6 +3817,108 @@
         }
       }
     },
+    "/api/v1/ride-needs": {
+      "get": {
+        "tags": [
+          "driver"
+        ],
+        "summary": "What a passenger can ask for on a ride",
+        "description": "Drives the request picker, and carries the wording so a phrasing correction is a server change rather than an app release.\n\nEvery entry is a **need**, meaning something the driver does. None is a record of anything about a person: a tall passenger, a passenger who gets carsick and a passenger with a mobility impairment all select the same option and the system cannot tell them apart. Law 2024/017 prohibits processing health data, and this is what that looks like in practice (I9).\n\n`undertakings_*` is the text a driver signs before being offered a ride carrying any of these. Without it a passenger would be relying on behaviour nobody agreed to, and could be surcharged for asking.",
+        "operationId": "list_ride_needs_api_v1_ride_needs_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RideNeedsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request or schema failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or not visible to the caller",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "State conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Semantically invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited. Carries Retry-After.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Not implemented yet (Phase 0 stub)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/driver/kyc/documents": {
       "post": {
         "tags": [
@@ -4773,6 +4875,16 @@
           "allows_guide_animal": {
             "type": "boolean",
             "title": "Allows Guide Animal",
+            "default": false
+          },
+          "requires_extra_legroom": {
+            "type": "boolean",
+            "title": "Requires Extra Legroom",
+            "default": false
+          },
+          "prefers_quiet_ride": {
+            "type": "boolean",
+            "title": "Prefers Quiet Ride",
             "default": false
           },
           "prefers_text_contact": {
@@ -6227,6 +6339,27 @@
             "title": "Accessibility Required",
             "description": "Per-trip vehicle requirements. Defaults from the passenger profile."
           },
+          "ride_needs": {
+            "items": {
+              "$ref": "#/components/schemas/RideNeed"
+            },
+            "type": "array",
+            "title": "Ride Needs",
+            "description": "What the passenger asked the driver to do on this trip. Returned to both parties: the passenger to confirm what they asked for, the driver because they cannot do it otherwise. Nothing here says why it was asked for (I9)."
+          },
+          "ride_needs_note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 140
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ride Needs Note",
+            "description": "Free text accompanying 'other'. Capped hard; it reaches another person."
+          },
           "pin": {
             "anyOf": [
               {
@@ -6240,6 +6373,21 @@
             "description": "Four-digit pickup PIN. Populated for the passenger on every read so it survives an app restart. Always null for the driver and for admins.",
             "examples": [
               "4821"
+            ]
+          },
+          "announcement": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Announcement",
+            "description": "The current status as one spoken sentence, for a passenger who cannot read the screen. Written to be heard rather than read and returned by the server so the wording can be corrected without an app release, and so the French is written once rather than in every client.\n\nNull for the driver: it is the passenger's own ride being narrated, and the arrival line contains the PIN.",
+            "examples": [
+              "Votre chauffeur est arrive. Toyota Corolla de couleur blanc."
             ]
           },
           "driver": {
@@ -6464,6 +6612,28 @@
             "maxItems": 5,
             "title": "Accessibility Required",
             "description": "Overrides the passenger's standing profile for this trip only. Vehicle capabilities, never a personal attribute (I9)."
+          },
+          "ride_needs": {
+            "items": {
+              "$ref": "#/components/schemas/RideNeed"
+            },
+            "type": "array",
+            "maxItems": 7,
+            "title": "Ride Needs",
+            "description": "What the driver is asked to do on this trip. A closed vocabulary served by GET /ride-needs, so a phrasing correction is a server change rather than an app release."
+          },
+          "ride_needs_note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 140
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ride Needs Note",
+            "description": "Accompanies 'other'. Capped at 140 characters because it reaches another person: long enough to be useful, too short to hold an address."
           }
         },
         "additionalProperties": false,
@@ -6624,6 +6794,111 @@
         ],
         "title": "RideMode"
       },
+      "RideNeed": {
+        "type": "string",
+        "enum": [
+          "extra_legroom",
+          "climate_adjusted",
+          "windows_closed",
+          "spoken_itinerary",
+          "guided_tour",
+          "quiet_ride",
+          "other"
+        ],
+        "title": "RideNeed",
+        "description": "Something the passenger asks the driver to do on this trip.\n\nA need, never a diagnosis (I9). Every member below names an action the\ndriver takes. Somebody tall, somebody who gets carsick and somebody with a\nmobility impairment choose the same value and the system cannot tell them\napart, which is precisely what keeps this outside the health data Law\n2024/017 prohibits processing.\n\nDistinct from `VehicleCapability`: that constrains which cars can be\nmatched, this constrains what the driver does once matched. Most needs\nimply no capability at all, and treating them as capabilities would shrink\nthe pool of vehicles for no reason."
+      },
+      "RideNeedInfo": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label_fr": {
+            "type": "string",
+            "title": "Label Fr"
+          },
+          "label_en": {
+            "type": "string",
+            "title": "Label En"
+          },
+          "driver_action_fr": {
+            "type": "string",
+            "title": "Driver Action Fr"
+          },
+          "driver_action_en": {
+            "type": "string",
+            "title": "Driver Action En"
+          },
+          "requires_undertaking": {
+            "type": "boolean",
+            "title": "Requires Undertaking",
+            "description": "Whether a driver must have signed the undertakings before being offered a ride carrying this need. True for anything the driver does rather than anything the car has."
+          },
+          "vehicle_capability": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vehicle Capability",
+            "description": "The vehicle capability this implies, if any. Most needs imply none: keeping the windows closed is behaviour, not a property of the car, so it must not shrink the pool of vehicles."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key",
+          "label_fr",
+          "label_en",
+          "driver_action_fr",
+          "driver_action_en",
+          "requires_undertaking"
+        ],
+        "title": "RideNeedInfo",
+        "description": "One thing a passenger can ask for, and what the driver does about it.\n\nA need, never a diagnosis. Every entry describes an action the driver\ntakes; none records anything about the person asking. Somebody tall,\nsomebody who gets carsick and somebody with a mobility impairment select\nthe same option and the system cannot tell them apart, which is what\nkeeps this the right side of Law 2024/017 (I9)."
+      },
+      "RideNeedsResponse": {
+        "properties": {
+          "needs": {
+            "items": {
+              "$ref": "#/components/schemas/RideNeedInfo"
+            },
+            "type": "array",
+            "title": "Needs"
+          },
+          "undertakings_fr": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Undertakings Fr"
+          },
+          "undertakings_en": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Undertakings En"
+          },
+          "undertakings_version": {
+            "type": "string",
+            "title": "Undertakings Version"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "needs",
+          "undertakings_fr",
+          "undertakings_en",
+          "undertakings_version"
+        ],
+        "title": "RideNeedsResponse"
+      },
       "RideOffer": {
         "properties": {
           "id": {
@@ -6679,6 +6954,26 @@
             },
             "type": "array",
             "title": "Accessibility Required"
+          },
+          "ride_needs": {
+            "items": {
+              "$ref": "#/components/schemas/RideNeed"
+            },
+            "type": "array",
+            "title": "Ride Needs",
+            "description": "What the driver is being asked to do, shown before they accept. Actions only: nothing here says anything about the passenger, because nothing about them was recorded (I9)."
+          },
+          "ride_needs_note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 140
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ride Needs Note"
           },
           "wave": {
             "type": "integer",
@@ -7267,7 +7562,8 @@
           "boot_space",
           "front_seat",
           "driver_assist",
-          "guide_animal"
+          "guide_animal",
+          "extra_legroom"
         ],
         "title": "VehicleCapability",
         "description": "Requirements a vehicle must satisfy. Never a fact about a person (I9).\n\nLaw 2024/017 prohibits processing health data. A wheelchair user is not\nrecorded as a wheelchair user; a trip is recorded as requiring a ramp.\nThe matcher only ever compares this enum against vehicle columns."

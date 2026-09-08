@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import OtpInput from '../components/OtpInput';
+import { t } from '../../shared/services/strings';
 import { peekOtp, requestOtp, verifyOtp } from '../services/authApi';
 import { getAccessToken, getRouteForRole, getStoredUser } from '../services/session';
 
@@ -64,7 +65,7 @@ export default function LoginPage() {
       setResendAfterSeconds(response.resend_after_s);
       setSecondsLeft(response.resend_after_s ?? 0);
       setCode('');
-      setNoticeMessage('Enter the code that was sent to your phone.');
+      setNoticeMessage(t('auth.enterCode'));
 
       // No SMS gateway is wired, so in development the server can hand
       // the code straight back. Returns null on a real deployment.
@@ -104,11 +105,11 @@ export default function LoginPage() {
 
   return (
     <main className="app-shell">
-      <h1>Log in</h1>
-      <p>Use your phone number in international format, for example +237600000001.</p>
+      <h1>{t('auth.login.title')}</h1>
+      <p>{t('auth.login.hint')}</p>
       <form onSubmit={handleSubmit} className="form-stack">
         <input
-          placeholder="Phone number"
+          placeholder={t('auth.phone')}
           value={phone}
           onChange={(e) => setPhone(sanitizePhone(e.target.value))}
           autoComplete="tel"
@@ -118,10 +119,10 @@ export default function LoginPage() {
         {challengeId ? (
           <>
             <OtpInput value={code} onChange={setCode} length={4} disabled={isSubmitting} />
-            <p>Code expires at {expiresLabel}.</p>
+            <p>{t('auth.expires')} {expiresLabel}.</p>
             <div className="button-row">
               <button className="primary-button" type="submit" disabled={isSubmitting || code.length < 4}>
-                {isSubmitting ? 'Verifying...' : 'Verify code'}
+                {isSubmitting ? t('auth.verifying') : t('auth.verify')}
               </button>
               <button
                 className="secondary-button"
@@ -129,27 +130,28 @@ export default function LoginPage() {
                 onClick={handleRequestOtp}
                 disabled={isSubmitting || secondsLeft > 0}
               >
-                {secondsLeft > 0 ? `Send a new code in ${secondsLeft}s` : 'Send a new code'}
+                {secondsLeft > 0
+                  ? `${t('auth.resendIn')} ${secondsLeft}s`
+                  : t('auth.resend')}
               </button>
             </div>
           </>
         ) : (
           <button className="primary-button" type="submit" disabled={isSubmitting || !phone.trim()}>
-            {isSubmitting ? 'Sending code...' : 'Send code'}
+            {isSubmitting ? t('auth.sending') : t('auth.send')}
           </button>
         )}
       </form>
       {noticeMessage ? <p>{noticeMessage}</p> : null}
       {devCode ? (
         <p className="dev-otp">
-          <strong>Development code: {devCode}</strong>
+          <strong>{t('auth.devCode')} {devCode}</strong>
           <br />
-          No SMS gateway is wired, so the server is showing you the code it
-          would have sent. This does not exist outside development.
+          {t('auth.devNote')}
         </p>
       ) : null}
-      {errorMessage ? <p>{errorMessage}</p> : null}
-      <p>No account? <Link to="/signup">Sign up</Link></p>
+      {errorMessage ? <p className="form-error">{errorMessage}</p> : null}
+      <p>{t('auth.noAccount')} <Link to="/signup">{t('auth.signup')}</Link></p>
     </main>
   );
 }

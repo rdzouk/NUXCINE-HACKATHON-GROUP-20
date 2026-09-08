@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { sendRideMessage } from '../services/ridesApi';
+import { getLocale } from '../../shared/services/locale';
 
 /**
  * The four things a passenger actually needs to say at a kerb.
@@ -15,13 +16,14 @@ import { sendRideMessage } from '../services/ridesApi';
  * label on the button, not the message that arrives.
  */
 const TEMPLATES = [
-  { key: 'at_gate', label: 'I am at the gate' },
-  { key: 'two_min', label: 'Two minutes away' },
-  { key: 'cant_find_you', label: 'I cannot find you' },
-  { key: 'please_wait_5', label: 'Please wait five minutes' },
+  { key: 'at_gate', en: 'I am at the gate', fr: 'Je suis au portail' },
+  { key: 'two_min', en: 'Two minutes away', fr: 'Deux minutes' },
+  { key: 'cant_find_you', en: 'I cannot find you', fr: 'Je ne vous trouve pas' },
+  { key: 'please_wait_5', en: 'Please wait five minutes', fr: 'Attendez cinq minutes' },
 ];
 
 export default function MessagePicker({ rideId }) {
+  const en = getLocale() === 'en';
   const [sending, setSending] = useState('');
   const [sent, setSent] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
@@ -41,26 +43,34 @@ export default function MessagePicker({ rideId }) {
 
   return (
     <section className="message-picker">
-      <h2>Message your driver</h2>
+      <h2>{en ? 'Message your driver' : 'Ecrire au chauffeur'}</h2>
       <p className="section-note">
-        Fixed messages only. We never share either phone number.
+        {en
+          ? 'Fixed messages only. We never share either phone number.'
+          : "Messages predefinis uniquement. Aucun numero de telephone n'est jamais partage."}
       </p>
 
       <div className="message-picker__options">
-        {TEMPLATES.map((t) => (
+        {TEMPLATES.map((template) => (
           <button
-            key={t.key}
+            key={template.key}
             type="button"
             className="secondary-button"
-            disabled={sending === t.key}
-            onClick={() => send(t.key, t.label)}
+            disabled={sending === template.key}
+            onClick={() => send(template.key, en ? template.en : template.fr)}
           >
-            {sending === t.key ? 'Sending...' : t.label}
+            {sending === template.key
+              ? en ? 'Sending...' : 'Envoi...'
+              : en ? template.en : template.fr}
           </button>
         ))}
       </div>
 
-      {sent ? <p className="form-notice">Sent: {sent}</p> : null}
+      {sent ? (
+        <p className="form-notice">
+          {en ? 'Sent' : 'Envoye'}: {sent}
+        </p>
+      ) : null}
       {errorMessage ? <p className="form-error">{errorMessage}</p> : null}
     </section>
   );

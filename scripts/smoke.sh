@@ -101,7 +101,11 @@ echo
 
 echo "the capability vocabulary is served"
 CAPS=$(curl -sS "${BASE}/vehicles/capabilities")
-check "five capabilities" "5" "$(jq -r '.capabilities | length' <<< "$CAPS")"
+# Six since Phase 6 added extra_legroom. The count is asserted rather than
+# lower-bounded on purpose: a capability appearing without anybody noticing is
+# a change to what the matcher can exclude, and that should have to be admitted
+# here before it ships.
+check "six capabilities" "6" "$(jq -r '.capabilities | length' <<< "$CAPS")"
 check "each has a French label" "true" \
     "$(jq -r '[.capabilities[].label_fr | length > 0] | all' <<< "$CAPS")"
 check "each has an English label" "true" \

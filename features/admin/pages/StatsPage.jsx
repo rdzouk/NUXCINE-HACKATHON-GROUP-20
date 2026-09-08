@@ -1,28 +1,18 @@
-import { useMockAuth } from '../../shared/context/MockAuthContext';
-import Sidebar from '../components/Sidebar';
+import NotBuilt from '../components/NotBuilt';
+import { getLocale } from '../../shared/services/locale';
 
 export default function StatsPage() {
-  const { adminRides, adminDrivers, adminUsers } = useMockAuth();
-  const stats = [
-    { label: 'Total rides', value: adminRides.length },
-    { label: 'Online drivers', value: adminDrivers.filter((d) => d.status === 'online').length },
-    { label: 'Total users', value: adminUsers.length },
-  ];
+  const en = getLocale() === 'en';
 
   return (
-    <div className="admin-layout">
-      <Sidebar />
-      <main className="app-shell">
-        <h1>Statistics</h1>
-        <div className="stats-grid">
-          {stats.map((s) => (
-            <div key={s.label} className="stat-card">
-              <p className="stat-value">{s.value}</p>
-              <p className="stat-label">{s.label}</p>
-            </div>
-          ))}
-        </div>
-      </main>
-    </div>
+    <NotBuilt
+      title={en ? 'Statistics' : 'Statistiques'}
+      endpoint="GET /admin/stats"
+      note={
+        en
+          ? 'The counts the dashboard can honestly show are already on the overview screen, derived from the driver list. Anything beyond that needs an aggregation endpoint rather than a chart drawn over invented numbers.'
+          : "Les chiffres que le tableau de bord peut montrer honnetement sont deja sur l'ecran de synthese, derives de la liste des chauffeurs. Au-dela, il faut un endpoint d'agregation, pas un graphique trace sur des nombres inventes."
+      }
+    />
   );
 }

@@ -43,6 +43,11 @@ class AccessibilityProfile(VoraModel):
     allows_guide_animal: bool = False
     # A communication preference, not a vehicle capability. It is never used as
     # a matching predicate; it selects canned messages over a voice call.
+    requires_extra_legroom: bool = False
+    # A preference about the journey, never about the person. It does
+    # not narrow the vehicle pool; it changes what the driver is asked
+    # to do.
+    prefers_quiet_ride: bool = False
     prefers_text_contact: bool = False
 
     def to_capabilities(self) -> list[VehicleCapability]:

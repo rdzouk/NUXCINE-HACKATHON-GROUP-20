@@ -1,3 +1,4 @@
+import { getLocale } from '../../shared/services/locale';
 import {
   clearSession,
   getAccessToken,
@@ -25,6 +26,13 @@ function buildHeaders(token, headers = {}) {
 
   if (!mergedHeaders.has('Content-Type')) {
     mergedHeaders.set('Content-Type', 'application/json');
+  }
+
+  // The app's language, not the browser's. Without this the API negotiates
+  // from Accept-Language and answers an English screen in French, which is
+  // how "Send code" came to be followed by "Trop de tentatives."
+  if (!mergedHeaders.has('Accept-Language')) {
+    mergedHeaders.set('Accept-Language', getLocale());
   }
 
   if (token) {

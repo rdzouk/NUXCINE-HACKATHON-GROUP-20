@@ -146,7 +146,7 @@ REQUESTS: list[Request] = [
         '  "dropoff": {"lat": 3.9010, "lng": 11.5540, '
         '"label": "Ngousso Chapelle"},\n'
         '  "seats": 1,\n  "mode": "corridor"\n}',
-        "**Bet 2.** Each passenger pays for their own leg at 0.62 of the "
+        "**Bet 2.** Each passenger pays for their own leg at 0.68 of the "
         "exclusive rate, measured along the route actually driven.\n\n"
         "Three passengers each pay less than exclusive hire while the driver "
         "collects more than one exclusive fare, because the vehicle is not "

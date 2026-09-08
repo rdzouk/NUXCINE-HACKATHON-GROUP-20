@@ -45,6 +45,9 @@ EXPECTED_ROUTES: set[tuple[str, str]] = {
     ("POST", f"{API}/driver/offers/{{offer_id}}/accept"),
     ("POST", f"{API}/driver/offers/{{offer_id}}/decline"),
     ("GET", f"{API}/vehicles/capabilities"),
+    # What a passenger may ask for on a ride, plus the text a driver signs
+    # before being offered one. Needs, never diagnoses (I9).
+    ("GET", f"{API}/ride-needs"),
     ("GET", f"{API}/share/{{token}}"),
     # Added at Phase 1. Not in the original §6 list: deliverable 5 requires
     # document upload and an admin approval step, and §6 specified neither.
@@ -297,6 +300,7 @@ def test_the_capability_vocabulary_is_served(client):
     capabilities = response.json()["capabilities"]
     assert {c["key"] for c in capabilities} == {
         "ramp", "boot_space", "front_seat", "driver_assist", "guide_animal",
+        "extra_legroom",
     }
     for capability in capabilities:
         assert capability["label_fr"] and capability["label_en"]

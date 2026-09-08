@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { peekOtp, requestOtp, verifyOtp } from '../services/authApi';
 import { getAccessToken, getRouteForRole, getStoredUser } from '../services/session';
+import { t } from '../../shared/services/strings';
 
 function sanitizePhone(value) {
   const trimmed = value.trim();
@@ -92,11 +93,11 @@ export default function SignupPage() {
 
   return (
     <main className="app-shell">
-      <h1>Create account</h1>
-      <p>Accounts are created after phone verification. Use international format, for example +237600000001.</p>
+      <h1>{t('auth.signupTitle')}</h1>
+      <p>{t('auth.signupHint')}</p>
       <form onSubmit={handleSubmit} className="form-stack">
         <input
-          placeholder="Phone number"
+          placeholder={t('auth.phone')}
           value={phone}
           onChange={(e) => setPhone(sanitizePhone(e.target.value))}
           autoComplete="tel"
@@ -106,20 +107,17 @@ export default function SignupPage() {
         {challengeId ? (
           <>
             <input
-              placeholder="OTP code"
+              placeholder={t('auth.code')}
               value={code}
               onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 8))}
               autoComplete="one-time-code"
               inputMode="numeric"
               disabled={isSubmitting}
             />
-            <p>
-              Code expires at {expiresLabel}.
-              {typeof resendAfterSeconds === 'number' ? ` You can request another code after ${resendAfterSeconds} seconds.` : ''}
-            </p>
+            <p>{t('auth.expires')} {expiresLabel}.</p>
             <div className="button-row">
               <button className="primary-button" type="submit" disabled={isSubmitting || code.trim().length < 4}>
-                {isSubmitting ? 'Creating account...' : 'Verify and continue'}
+                {isSubmitting ? t('auth.verifying') : t('auth.verify')}
               </button>
               <button
                 className="secondary-button"
@@ -127,27 +125,26 @@ export default function SignupPage() {
                 onClick={handleRequestOtp}
                 disabled={isSubmitting}
               >
-                Send a new code
+                {t('auth.resend')}
               </button>
             </div>
           </>
         ) : (
           <button className="primary-button" type="submit" disabled={isSubmitting || !phone.trim()}>
-            {isSubmitting ? 'Sending code...' : 'Send code'}
+            {isSubmitting ? t('auth.sending') : t('auth.send')}
           </button>
         )}
       </form>
       {noticeMessage ? <p>{noticeMessage}</p> : null}
       {devCode ? (
         <p className="dev-otp">
-          <strong>Development code: {devCode}</strong>
+          <strong>{t('auth.devCode')} {devCode}</strong>
           <br />
-          No SMS gateway is wired, so the server is showing you the code it
-          would have sent. This does not exist outside development.
+          {t('auth.devNote')}
         </p>
       ) : null}
-      {errorMessage ? <p>{errorMessage}</p> : null}
-      <p>Already have an account? <Link to="/login">Log in</Link></p>
+      {errorMessage ? <p className="form-error">{errorMessage}</p> : null}
+      <p>{t('auth.haveAccount')} <Link to="/login">{t('auth.login')}</Link></p>
     </main>
   );
 }

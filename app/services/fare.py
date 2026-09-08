@@ -3,7 +3,7 @@
 Deterministic, explainable in one sentence, and computed only on the server.
 
     exclusive = base + (per_km * km) + (per_min * min), clamped to [minimum, ceiling]
-    corridor  = 0.62 * that rate, applied to the passenger's own travelled distance
+    corridor  = 0.68 * that rate, applied to the passenger's own travelled distance
 
 Three decisions worth defending to a jury:
 
@@ -18,12 +18,30 @@ a GPS spike produces an absurd distance, the fare is capped rather than
 charged. A cap that trips is a visible incident; an uncapped bug is a charge on
 somebody's money.
 
-**Corridor at 0.62.** Chosen so that each passenger pays clearly less than
-exclusive hire, while the sum across a filled vehicle exceeds a single
-exclusive fare. That is the whole economic proposition of the corridor model:
-riders pay less and the driver earns more, because the vehicle is not being
-sold to one person. Deliberately a flat multiplier and not a bidding or
-load-factor model, which would be unexplainable and unverifiable at demo scale.
+**Corridor at 0.68.** Chosen so that each passenger pays clearly less than
+exclusive hire, while two legs together come to more than one exclusive fare.
+That is the whole economic proposition of the corridor model: riders pay less
+and the driver earns more, because the vehicle is not being sold to one person.
+
+It was 0.62, calibrated when three bookings could share a vehicle. The cap is
+now two, for a safety reason rather than a commercial one, and at 0.62 two legs
+came to 2250 XAF against 2300 for a single exclusive fare on the same route.
+The driver was being asked to carry a stranger and take home less. A rate that
+makes the corridor worse for the person who has to agree to it is not a
+discount, it is a defect.
+
+The arithmetic it has to satisfy: rate * (full fare + joining leg fare) must
+exceed the full fare. On a joining leg worth about half the route, that puts
+the floor near 0.64. 0.68 clears it with room, and still leaves every passenger
+paying roughly a third less than exclusive hire.
+
+**This holds when the joining leg is a real share of the route, and not
+otherwise.** A joiner riding two streets adds two streets of fare, and no
+multiplier changes that. The corridor is worth the driver's while because the
+matcher only offers legs that are contained in the route already being driven.
+
+Deliberately a flat multiplier and not a bidding or load-factor model, which
+would be unexplainable and unverifiable at demo scale.
 
 No traffic prediction and no dynamic surge. We have no historical data, and a
 model faked from nothing is the sort of claim a jury checks.
@@ -53,7 +71,7 @@ class FareConfig:
     # Roughly a cross-city exclusive trip. Anything above this is a bug, not a
     # journey, and is capped rather than charged.
     ceiling_fare_xaf: int = 15_000
-    corridor_rate: float = 0.62
+    corridor_rate: float = 0.68
     surge_multiplier: float = 1.0
 
     def __post_init__(self) -> None:

@@ -65,6 +65,7 @@ CAPABILITY_COLUMNS: dict[str, str] = {
     "front_seat": "v.front_seat_available",
     "driver_assist": "v.driver_assists",
     "guide_animal": "v.accepts_guide_animal",
+    "extra_legroom": "v.has_extra_legroom",
 }
 
 
@@ -453,7 +454,7 @@ async def list_open_offers(session: AsyncSession, *, driver: Driver) -> list:
                 o.distance_to_pickup_m,
                 r.mode, r.seats, r.pickup_label, r.dropoff_label,
                 r.quoted_distance_m, r.quoted_duration_s, r.quoted_fare_xaf,
-                r.accessibility_required,
+                r.accessibility_required, r.ride_needs, r.ride_needs_note,
                 ST_Y(r.pickup_geom::geometry)  AS p_lat,
                 ST_X(r.pickup_geom::geometry)  AS p_lng,
                 ST_Y(r.dropoff_geom::geometry) AS d_lat,
@@ -470,9 +471,15 @@ async def list_open_offers(session: AsyncSession, *, driver: Driver) -> list:
         {"driver_id": driver.id},
     )
 
-    from app.schemas.common import NamedPlace, RideMode, VehicleCapability
+    from app.schemas.common import (
+        NamedPlace,
+        RideMode,
+        RideNeed,
+        VehicleCapability,
+    )
 
     known = {v.value for v in VehicleCapability}
+    known_needs = {n.value for n in RideNeed}
     return [
         RideOfferSchema(
             id=row.id,
@@ -490,6 +497,13 @@ async def list_open_offers(session: AsyncSession, *, driver: Driver) -> list:
                 for c in (row.accessibility_required or [])
                 if c in known
             ],
+            # Shown before the driver decides, not after. Accepting and only
+            # then reading what was asked is how somebody breaks an
+            # undertaking they meant to keep.
+            ride_needs=[
+                RideNeed(n) for n in (row.ride_needs or []) if n in known_needs
+            ],
+            ride_needs_note=row.ride_needs_note,
             wave=row.wave,
             expires_at=row.expires_at,
             created_at=row.created_at,

@@ -12,7 +12,7 @@ there. Exposure is opt-in, and the diff that exposes something is visible.
 from __future__ import annotations
 
 from app.models.user import Driver, User
-from app.schemas.common import NamedPlace, RideMode, VehicleCapability
+from app.schemas.common import NamedPlace, RideMode, RideNeed, VehicleCapability
 from app.schemas.ride import (
     LOCATION_VISIBLE_STATUSES,
     RideDriverSummary,
@@ -29,6 +29,7 @@ from app.schemas.user import (
 from app.schemas.user import (
     User as UserSchema,
 )
+from app.services import accessibility
 
 
 def serialize_accessibility(user: User) -> AccessibilityProfile:
@@ -86,6 +87,17 @@ def _first_name(display_name: str | None, fallback: str) -> str:
     if display_name and display_name.strip():
         return display_name.strip().split()[0]
     return fallback
+
+
+def _ride_needs(values: list[str] | None) -> list[RideNeed]:
+    """Drop anything the enum no longer knows about.
+
+    A need retired from the vocabulary still sits on historical rides. Raising
+    on it would make an old trip unreadable, which is a worse outcome than
+    quietly showing one fewer line on a completed journey.
+    """
+    known = {n.value for n in RideNeed}
+    return [RideNeed(v) for v in (values or []) if v in known]
 
 
 def _capabilities(values) -> list[VehicleCapability]:
@@ -198,9 +210,39 @@ def serialize_ride(
         quoted_duration_s=ride.quoted_duration_s,
         actual_distance_m=ride.actual_distance_m,
         accessibility_required=_capabilities(ride.accessibility_required),
+        # Sent to both parties, unlike the PIN. The passenger needs to see what
+        # they asked for; the driver cannot carry it out without being told.
+        # Neither side learns why it was asked for, because that was never
+        # recorded (I9).
+        ride_needs=_ride_needs(ride.ride_needs),
+        ride_needs_note=ride.ride_needs_note,
         # The passenger reads this aloud at pickup. The driver must never see
         # it, or the PIN stops proving anything.
         pin=ride.pin if is_passenger else None,
+        # The same line, spoken. Gated by actor exactly as the PIN is, because
+        # the arrival announcement contains it: a driver who could hear this
+        # would not need the passenger to read it out, and the whole
+        # anti-impersonation check would stop proving anything.
+        #
+        # This is what makes the PIN usable by a passenger who cannot see it.
+        # Without it the safety feature is sighted-only.
+        announcement=(
+            accessibility.announcement(
+                status,
+                locale=(getattr(passenger_user, "locale", None) or "fr"),
+                vehicle=(
+                    f"{vehicle_summary.make} {vehicle_summary.model}"
+                    if vehicle_summary
+                    else None
+                ),
+                color=vehicle_summary.color if vehicle_summary else None,
+                plate=vehicle_summary.plate if vehicle_summary else None,
+                pin=ride.pin,
+                fare_xaf=ride.final_fare_xaf or ride.quoted_fare_xaf,
+            )
+            if is_passenger
+            else None
+        ),
         driver=driver_summary,
         vehicle=vehicle_summary,
         passenger=passenger_summary,

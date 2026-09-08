@@ -165,6 +165,8 @@ async def create_ride(
     quote_id: str,
     seats: int,
     accessibility_required: list[str],
+    ride_needs: list[str] | None = None,
+    ride_needs_note: str | None = None,
     idempotency_key: str,
 ) -> tuple[Ride, bool]:
     """Create a ride from a signed quote. Returns (ride, was_created).
@@ -282,6 +284,13 @@ async def create_ride(
         quoted_distance_m=payload.distance_m,
         quoted_duration_s=payload.duration_s,
         accessibility_required=accessibility_required,
+        ride_needs=ride_needs or [],
+        # Only carried when "other" was actually chosen. A note attached to no
+        # need is a free-text field with no reason to exist, and this one
+        # reaches another person.
+        ride_needs_note=(
+            ride_needs_note if ride_needs and "other" in ride_needs else None
+        ),
         pin=pin,
         pin_hash=hashing.hash_otp(pin),
         idempotency_key=idempotency_key,

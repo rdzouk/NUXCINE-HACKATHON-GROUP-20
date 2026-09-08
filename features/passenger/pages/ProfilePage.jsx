@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import BottomNav from '../components/BottomNav';
+import LanguageToggle from '../../shared/components/LanguageToggle';
 import { getMe, getVehicleCapabilities, updateMe } from '../../shared/services/profileApi';
 import { clearSession } from '../../auth/services/session';
+import { getLocale } from '../../shared/services/locale';
+import { t } from '../../shared/services/strings';
 
 /**
  * The profile field each capability maps to.
@@ -21,9 +24,11 @@ const CAPABILITY_FIELDS = {
   front_seat: 'requires_front_seat',
   driver_assist: 'requires_driver_assist',
   guide_animal: 'allows_guide_animal',
+  extra_legroom: 'requires_extra_legroom',
 };
 
 export default function ProfilePage() {
+  const locale = getLocale();
   const [user, setUser] = useState(null);
   const [capabilities, setCapabilities] = useState([]);
   const [saving, setSaving] = useState('');
@@ -64,7 +69,7 @@ export default function ProfilePage() {
   if (!user) {
     return (
       <main className="app-shell">
-        <h1>Profile</h1>
+        <h1>{t('common.profile')}</h1>
         <p>{errorMessage || 'Loading...'}</p>
         <BottomNav />
       </main>
@@ -73,16 +78,23 @@ export default function ProfilePage() {
 
   return (
     <main className="app-shell">
-      <h1>Profile</h1>
+      <h1>{t('common.profile')}</h1>
 
-      <p><strong>Name:</strong> {user.display_name ?? 'Not set'}</p>
-      <p><strong>Phone:</strong> {user.phone_e164 ?? user.phone}</p>
+      <p><strong>{locale === 'en' ? 'Name' : 'Nom'}:</strong>{' '}
+        {user.display_name ?? (locale === 'en' ? 'Not set' : 'Non defini')}</p>
+      <p><strong>{locale === 'en' ? 'Phone' : 'Telephone'}:</strong>{' '}
+        {user.phone_e164 ?? user.phone}</p>
 
-      <h2>Vehicle needs</h2>
+      <div className="profile-row">
+        <span>{t('common.language')}</span>
+        <LanguageToggle />
+      </div>
+
+      <h2>{locale === 'en' ? 'Vehicle needs' : 'Besoins du vehicule'}</h2>
       <p className="section-note">
-        These describe the vehicle sent to you, so we only offer rides in cars
-        that can carry you. We store nothing about you, only what the car needs
-        to have.
+        {locale === 'en'
+          ? 'These describe the vehicle sent to you, so we only offer rides in cars that can carry you. We store nothing about you, only what the car needs to have.'
+          : "Ceci decrit le vehicule qui vous est envoye, afin de ne proposer que des voitures adaptees. Nous n'enregistrons rien sur vous, seulement ce que la voiture doit avoir."}
       </p>
 
       <ul className="toggle-list">
@@ -100,8 +112,12 @@ export default function ProfilePage() {
                   onChange={(e) => toggle(field, e.target.checked)}
                 />
                 <span>
-                  <span className="toggle-list__name">{cap.label_en}</span>
-                  <span className="toggle-list__note">{cap.description_en}</span>
+                  <span className="toggle-list__name">
+                    {locale === 'en' ? cap.label_en : cap.label_fr}
+                  </span>
+                  <span className="toggle-list__note">
+                    {locale === 'en' ? cap.description_en : cap.description_fr}
+                  </span>
                 </span>
               </label>
             </li>
@@ -109,8 +125,32 @@ export default function ProfilePage() {
         })}
       </ul>
 
-      <h2>Contact</h2>
+      <h2>{locale === 'en' ? 'During the ride' : 'Pendant le trajet'}</h2>
       <ul className="toggle-list">
+        <li>
+          <label>
+            <input
+              type="checkbox"
+              checked={Boolean(user.accessibility?.prefers_quiet_ride)}
+              disabled={saving === 'prefers_quiet_ride'}
+              onChange={(e) => toggle('prefers_quiet_ride', e.target.checked)}
+            />
+            <span>
+              <span className="toggle-list__name">
+                {locale === 'en' ? 'Quiet ride' : 'Trajet silencieux'}
+              </span>
+              {/* No reason is asked for and none is stored. A migraine, an
+                  interview to prepare for, exhaustion, or simply not wanting
+                  to talk are all the same request as far as the system is
+                  concerned, and none of them are its business. */}
+              <span className="toggle-list__note">
+                Your driver is asked to keep conversation to what the trip
+                needs: confirming the pickup, and telling you when you have
+                arrived. You never have to explain why.
+              </span>
+            </span>
+          </label>
+        </li>
         <li>
           <label>
             <input
@@ -120,7 +160,9 @@ export default function ProfilePage() {
               onChange={(e) => toggle('prefers_text_contact', e.target.checked)}
             />
             <span>
-              <span className="toggle-list__name">Prefer written messages</span>
+              <span className="toggle-list__name">
+                {locale === 'en' ? 'Prefer written messages' : 'Preferer les messages ecrits'}
+              </span>
               {/* Deliberately not a vehicle capability, so it does not narrow
                   the driver pool. It changes how a driver is asked to reach
                   you, nothing else. */}
@@ -144,13 +186,17 @@ export default function ProfilePage() {
             window.location.assign('/login');
           }}
         >
-          Log out
+          {t('common.logout')}
         </button>
       </div>
 
       <div className="legal-links">
-        <Link to="/legal/privacy">Privacy policy</Link>
-        <Link to="/legal/terms">Terms and conditions</Link>
+        <Link to="/legal/privacy">
+          {locale === 'en' ? 'Privacy policy' : 'Confidentialite'}
+        </Link>
+        <Link to="/legal/terms">
+          {locale === 'en' ? 'Terms and conditions' : 'Conditions generales'}
+        </Link>
       </div>
 
       <BottomNav />

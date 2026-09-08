@@ -26,9 +26,9 @@ you lose drivers. The offer is targeted at that one driver rather than fanned
 out, because the normal matching wave excludes any driver already on a live
 ride, which is every corridor driver by definition.
 
-**Each passenger pays their own leg.** Not a split of one fare. At 0.62 of the
-exclusive rate applied to the distance they personally travel, three passengers
-pay less each than exclusive hire while the driver earns more than one exclusive
+**Each passenger pays their own leg.** Not a split of one fare. At 0.68 of the
+exclusive rate applied to the distance they personally travel, both passengers
+pay less than exclusive hire while the driver earns more than one exclusive
 fare. That is the whole economic proposition, and it is defensible in one
 sentence without any cleverness.
 
@@ -84,11 +84,38 @@ MAX_DETOUR_SECONDS = 240
 # data, and a model faked from nothing is the sort of claim a jury checks.
 URBAN_SPEED_MPS = 5.6
 
-# The plan is explicit: no more than three legs. Beyond that the first
-# passenger's journey stops resembling what they booked, and the routing
-# problem stops being solvable in the time a driver will wait. The originating
-# passenger holds leg 1, so this permits two joiners.
-MAX_LEGS = 3
+# Two bookings to a vehicle. Never three.
+#
+# This counts *bookings*, not people, and the distinction is the whole rule.
+# The first passenger may bring friends: they are one booking, they know each
+# other, and they arrived together. What is capped is how many separate
+# strangers the platform introduces into one car, and that number is one.
+#
+# The build plan allowed three legs. This is tighter on purpose, because the
+# binding constraint is safety rather than routing. A third booking would mean
+# two unrelated parties in a car with somebody who agreed to share with one.
+#
+# The originating passenger holds leg 1, so this permits exactly one joiner.
+MAX_LEGS = 2
+
+# The joining passenger rides in front, beside the driver, and travels alone.
+#
+# One seat, not a party. The first passenger booked a private journey and then
+# agreed to share it with *a* stranger; letting the joiner bring three of their
+# own would put the original passenger alone in a car with a group, which is
+# not what they agreed to and is the exact situation the cap exists to prevent.
+#
+# Seating them in front means nobody ends up beside a stranger in the back, and
+# keeps them in the driver's view rather than behind them. It costs nothing and
+# removes the arrangement's most likely failure.
+#
+# The seat is enforced as a vehicle capability, so a car whose front seat is
+# not free is never offered the join at all. It is a fact about the car, never
+# about either person (I9).
+JOINER_SEAT_REQUIREMENT = "front_seat"
+
+# A joiner takes exactly one seat. The originating booking has no such limit.
+MAX_JOINER_SEATS = 1
 
 # A leg is written when the driver is asked, not when they answer, so a pending
 # join holds its place in the boarding order and its seats cannot be sold twice.
@@ -174,6 +201,11 @@ _CANDIDATES_SQL = text(
                 AND cl.state IN ('offered', 'confirmed')) AS seats_sold
         FROM rides r
         JOIN drivers d ON d.id = r.driver_id
+        -- The joiner sits in front, so a car without a free front seat cannot
+        -- take one. Filtered here rather than after fetching, so a car that
+        -- cannot seat them is never a candidate in the first place.
+        JOIN vehicles v ON v.driver_id = d.id AND v.is_active
+             AND v.front_seat_available
         WHERE r.mode = 'corridor'
           AND r.status IN ('accepted', 'arriving', 'arrived', 'in_progress')
           AND r.route_geom IS NOT NULL
@@ -236,6 +268,17 @@ async def find_candidates(
     compatible corridor is an ordinary outcome, and the caller falls back to
     exclusive hire.
     """
+    # A joining booking is one person. More than that is not a corridor join,
+    # it is a second group, so there is nothing to offer rather than a smaller
+    # set of candidates.
+    if seats > MAX_JOINER_SEATS:
+        logger.info(
+            "corridor_joiner_too_many_seats",
+            passenger_id=str(passenger_id),
+            seats=seats,
+        )
+        return []
+
     rows = await session.execute(
         _CANDIDATES_SQL,
         {

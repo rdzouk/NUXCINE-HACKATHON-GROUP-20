@@ -1,675 +1,1444 @@
-/* ===== Design tokens & reset ===== */
+/* ============================================================================
+   VORA
+
+   Dark, lime-accented, phone-shaped. Taken from the brand's own screens: true
+   black ground, one lime accent, tight bold headings, small letterspaced
+   eyebrows above them, rounded surfaces, and outlined circular icon buttons.
+
+   The accent is lime rather than emerald deliberately. Emerald on near-black
+   is what every dark theme looks like; lime on true black is what this brand
+   looks like, and that difference is most of the reason the first attempt
+   read as generic.
+
+   Everything is themed through the shared class names the 32 screens already
+   use, so restyling happens in one place rather than screen by screen. Adding
+   a screen costs nothing extra as long as it reuses these names.
+
+   Animation is CSS and SVG, never WebGL. The whole pitch is an app that works
+   on a bad network in Yaounde, so shipping a 3D runtime to draw a pulsing dot
+   would contradict the product. Everything below is a few kilobytes and starts
+   instantly.
+   ========================================================================= */
+
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');
+
 :root {
-  font-family: Georgia, 'Times New Roman', serif;
-  color: #17212b;
-  background: #e7ece9;
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
+  /* Ground and surfaces. One dark ground; surfaces lift with lightness, not
+     with borders, which is what keeps a dark UI from looking like a grid. */
+  --bg: #050505;
+  --bg-elevated: #0d0e0c;
+  --surface: #141613;
+  --surface-2: #1c1f19;
+  --hairline: rgba(255, 255, 255, 0.07);
+  --hairline-strong: rgba(255, 255, 255, 0.14);
 
-  --color-bg: #e7ece9;
-  --color-bg-alt: #dce6e2;
-  --color-surface: #ffffff;
-  --color-surface-muted: #f3f6f4;
-  --color-border: #a2bbb3;
-  --color-text: #17212b;
-  --color-primary: #285e55;
-  --color-primary-hover: #1f4a43;
-  --color-accent: #45756d;
-  --color-danger: #c0392b;
-  --font-heading: Georgia, 'Times New Roman', serif;
-  --font-ui: Arial, sans-serif;
+  /* One accent, used for the single most important thing on any screen. */
+  --accent: #c5f82a;
+  --accent-dim: #aee01f;
+  --accent-glow: rgba(197, 248, 42, 0.24);
+  --accent-ink: #10160a;
+
+  --text: #f5f7f0;
+  --text-dim: #9ea39a;
+  --text-faint: #6a6f68;
+
+  --danger: #ff5a5f;
+  --warn: #ffc14d;
+
+  --radius: 16px;
+  --radius-lg: 22px;
+  --radius-pill: 999px;
+
+  --font: 'Poppins', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  /* The phone. Every screen renders inside this width so the browser demo and
+     the installed PWA look like the same product. */
+  --shell: 460px;
+
+  color-scheme: dark;
+  font-family: var(--font);
+  color: var(--text);
+  background: var(--bg);
 }
 
-* {
-  box-sizing: border-box;
-}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
-html,
-body,
-#root {
-  min-height: 100%;
-  margin: 0;
-}
+html, body, #root { height: 100%; margin: 0; }
 
 body {
   min-width: 320px;
+  background:
+    radial-gradient(1100px 520px at 50% -12%, rgba(0, 230, 118, 0.10), transparent 62%),
+    var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  font-family: var(--font);
 }
 
-h1, h2, h3 {
-  font-family: var(--font-heading);
-  font-weight: 400;
-  margin: 0;
-}
+h1, h2, h3 { margin: 0; font-weight: 700; letter-spacing: -0.02em; line-height: 1.12; }
+h1 { font-size: clamp(1.7rem, 6vw, 2.3rem); }
+h2 { font-size: 1.12rem; font-weight: 600; }
+h3 { font-size: 1rem; font-weight: 600; }
+p  { margin: 0; line-height: 1.5; }
+a  { color: var(--accent); text-decoration: none; }
 
-h1 { font-size: clamp(1.8rem, 5vw, 3.2rem); line-height: 1.05; }
-h2 { font-size: clamp(1.3rem, 3vw, 1.8rem); }
-h3 { font-size: 1.1rem; }
+button, input, select, textarea { font-family: var(--font); color: inherit; }
 
-button, input, textarea {
-  font-family: var(--font-ui);
-}
+/* ---------------------------------------------------------------- shell -- */
 
-/* ===== Page shell (default — forms, lists, profile-style pages) ===== */
 .app-shell {
-  padding: 24px;
-  max-width: 480px;
-  margin: 0 auto;
+  width: 100%;
+  max-width: var(--shell);
   min-height: 100vh;
+  margin: 0 auto;
+  padding: 22px 20px calc(96px + env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
   gap: 16px;
+  background: var(--bg);
+  position: relative;
 }
 
-.centered {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: 12px;
-  margin-top: 60px;
-}
-
-/* ===== Page shell (map variant — booking, ride tracking, navigation) =====
-   Add class="app-shell map-shell" on any page rendering <MapView> full-size. */
+/* Wide surfaces (map, admin) still sit in the phone frame on a phone, and are
+   allowed to breathe on a laptop where a jury is actually watching. */
 .app-shell.map-shell {
-  max-width: 1280px;
-  padding: 24px;
-  display: grid;
-  grid-template-rows: auto minmax(420px, 1fr);
-  gap: 18px;
-  background: linear-gradient(145deg, #eff3ed 0%, var(--color-bg-alt) 100%);
+  max-width: 900px;
+  gap: 14px;
 }
+
+.centered { align-items: center; text-align: center; justify-content: center; gap: 14px; }
 
 .app-header {
   display: flex;
-  align-items: end;
+  align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  width: 100%;
+  gap: 14px;
 }
 
-.notification-bell {
-  position: relative;
-  color: var(--color-text);
-  text-decoration: none;
-  font-size: 1.3rem;
-  line-height: 1;
-}
-
-.notification-badge {
-  position: absolute;
-  top: -7px;
-  right: -9px;
-  min-width: 18px;
-  padding: 2px 5px;
-  border-radius: 999px;
-  background: var(--color-danger);
-  color: #fff;
-  text-align: center;
-  font: 700 0.65rem var(--font-ui);
-}
-
+/* Sentence case, no letter-spacing tricks. The accent marks one thing. */
+/* Small caps eyebrow above a headline. Letterspaced on purpose: it is the
+   brand's own device, used on every screen of the reference set. */
 .eyebrow {
-  margin: 0 0 4px;
-  color: var(--color-accent);
-  font: 700 0.72rem/1.2 var(--font-ui);
-  letter-spacing: 0.12em;
+  margin: 0 0 10px;
+  color: var(--text-dim);
+  font-size: 0.66rem;
+  font-weight: 500;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
+  line-height: 1.5;
 }
+
+.eyebrow--accent { color: var(--accent); }
 
 .status {
-  padding: 9px 13px;
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  color: var(--color-primary);
-  background: rgba(255, 255, 255, 0.55);
-  font: 700 0.75rem var(--font-ui);
+  padding: 8px 13px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  color: var(--text-dim);
+  font-size: 0.74rem;
+  font-weight: 500;
   white-space: nowrap;
 }
 
-.map-panel {
-  width: 100%;
-  min-height: 420px;
-  height: calc(100vh - 150px);
-  overflow: hidden;
-  border: 1px solid rgba(56, 86, 80, 0.35);
-  border-radius: 10px;
-  box-shadow: 0 18px 45px rgba(36, 61, 57, 0.18);
-}
+.section-note { color: var(--text-dim); font-size: 0.85rem; max-width: 52ch; }
+.form-error   { color: var(--danger); font-size: 0.86rem; font-weight: 500; }
+.form-notice  { color: var(--accent); font-size: 0.86rem; font-weight: 500; }
 
-.map-panel > div {
-  height: 100%;
-}
+/* -------------------------------------------------------------- buttons -- */
 
-/* ===== Buttons ===== */
 .primary-button {
-  background: var(--color-primary);
-  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  width: 100%;
+  padding: 16px 22px;
   border: none;
-  padding: 12px 20px;
-  border-radius: 8px;
-  font: 700 0.95rem var(--font-ui);
+  border-radius: var(--radius-pill);
+  background: linear-gradient(135deg, var(--accent), var(--accent-dim));
+  color: var(--accent-ink);
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 10px 26px -10px var(--accent-glow);
+  transition: transform 0.12s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+}
+
+.primary-button:active { transform: scale(0.98); }
+.primary-button:disabled { opacity: 0.4; box-shadow: none; cursor: default; }
+
+.secondary-button {
+  padding: 13px 18px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--hairline-strong);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 500;
   cursor: pointer;
   transition: background 0.15s ease;
 }
-.primary-button:hover { background: var(--color-primary-hover); }
 
-.secondary-button {
-  background: var(--color-surface-muted);
-  border: 1px solid var(--color-border);
-  color: var(--color-text);
-  padding: 10px 16px;
-  border-radius: 8px;
-  font: 600 0.9rem var(--font-ui);
-  cursor: pointer;
-  margin: 4px;
-}
+.secondary-button:active { background: var(--surface-2); }
+.secondary-button:disabled { opacity: 0.45; cursor: default; }
 
-.button-row {
-  display: flex;
-  gap: 10px;
-}
+.button-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.button-row .primary-button { width: auto; flex: 1; }
 
-.search-bar-button {
-  display: block;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
-  padding: 14px 16px;
-  text-decoration: none;
-  color: var(--color-text);
-  font: 600 1rem var(--font-ui);
-}
-
-/* ===== Forms ===== */
-.form-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin: 16px 0;
-}
-.form-stack input {
-  padding: 10px 12px;
-  border-radius: 6px;
-  border: 1px solid var(--color-border);
-  font-size: 0.95rem;
-}
-
-/* ===== Bottom nav (passenger / driver mobile shell) ===== */
-.bottom-nav {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  display: flex;
-  justify-content: space-around;
-  background: var(--color-surface);
-  border-top: 1px solid var(--color-border);
-  padding: 10px;
-}
-.bottom-nav a {
-  color: var(--color-text);
-  text-decoration: none;
-  font: 600 0.85rem var(--font-ui);
-}
-.bottom-nav .active {
-  color: var(--color-primary);
-  font-weight: 700;
-}
-
-/* ===== Stats & cards ===== */
-.stat-card {
-  background: var(--color-surface-muted);
-  border-radius: 10px;
-  padding: 16px;
-  text-align: center;
-}
-.stat-value {
-  font: 700 1.6rem var(--font-heading);
-  color: var(--color-primary);
-  margin: 0;
-}
-.stat-label {
-  font: 600 0.75rem var(--font-ui);
-  color: var(--color-accent);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin: 4px 0 0;
-}
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-}
-
-/* ===== Ride summary / panels ===== */
-.ride-summary, .ride-panel {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
-  padding: 16px;
-}
-
-/* ===== Safety ===== */
 .sos-button {
-  background: var(--color-danger);
-  color: #fff;
+  width: 100%;
+  padding: 16px;
   border: none;
-  padding: 14px;
-  border-radius: 8px;
-  width: 100%;
-  font: 700 1rem var(--font-ui);
-  cursor: pointer;
-  margin: 10px 0;
-}
-
-/* ===== Ratings ===== */
-.stars { font-size: 28px; }
-.star { color: #ccc; cursor: pointer; }
-.star--filled { color: #d4a017; }
-
-/* ===== Admin layout ===== */
-.admin-layout {
-  display: flex;
-  min-height: 100vh;
-}
-.admin-sidebar {
-  width: 200px;
-  background: #16241f;
-  color: #dce6e2;
-  padding: 24px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.admin-sidebar h2 {
+  border-radius: var(--radius-pill);
+  background: var(--danger);
   color: #fff;
-  font-size: 1.2rem;
-  margin-bottom: 12px;
-}
-.admin-sidebar a {
-  color: #b8c9c3;
-  text-decoration: none;
-  padding: 8px 10px;
-  border-radius: 6px;
-  font: 600 0.9rem var(--font-ui);
-}
-.admin-sidebar a.active {
-  background: var(--color-primary);
-  color: #fff;
-}
-.admin-table {
-  width: 100%;
-  border-collapse: collapse;
-  background: var(--color-surface);
-  border-radius: 8px;
-  overflow: hidden;
-}
-.admin-table th, .admin-table td {
-  border-bottom: 1px solid #eee;
-  padding: 10px 12px;
-  text-align: left;
-  font: 400 0.9rem var(--font-ui);
-}
-.admin-table th {
+  font-size: 1rem;
   font-weight: 700;
-  color: var(--color-accent);
-  text-transform: uppercase;
-  font-size: 0.75rem;
-  letter-spacing: 0.05em;
+  cursor: pointer;
 }
 
-/* ===== History lists ===== */
-.history-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-.history-list li {
-  border-bottom: 1px solid #e0e6e3;
-  padding: 12px 0;
-}
+.sos-button:disabled { opacity: 0.5; }
 
-/* ===== Responsive ===== */
-@media (max-width: 640px) {
-  .app-shell.map-shell {
-    padding: 14px;
-  }
-  .app-header {
-    align-items: start;
-    flex-direction: column;
-  }
-  .map-panel {
-    height: calc(100vh - 170px);
-  }
-  .admin-layout {
-    flex-direction: column;
-  }
-  .admin-sidebar {
-    width: 100%;
-    flex-direction: row;
-    overflow-x: auto;
-  }
+/* ---------------------------------------------------------------- forms -- */
+
+.form-stack { display: flex; flex-direction: column; gap: 12px; }
+
+.form-stack input, .place-search input, .dialog select {
+  width: 100%;
+  padding: 15px 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--hairline);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.98rem;
 }
 
-.legal-page h3 { margin-top: 24px; margin-bottom: 8px; }
-.legal-page p { line-height: 1.6; max-width: 65ch; }
-.legal-links { display: flex; flex-wrap: wrap; gap: 12px; }
-.legal-links a { color: var(--color-primary); font: 600 0.9rem var(--font-ui); }
+.form-stack input::placeholder, .place-search input::placeholder { color: var(--text-faint); }
 
-/* ===== Tier 3 screens =====
-   Structure comes from size and weight, not from boxes inside boxes. A
-   section is a heading, a hairline and its content. Colours are the tokens
-   above; nothing here introduces a new one. */
-
-.section-note {
-  margin: 4px 0 12px;
-  color: var(--color-accent);
-  font: 400 0.85rem/1.45 var(--font-ui);
-  max-width: 52ch;
+.form-stack input:focus, .place-search input:focus, .dialog select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
 }
 
-.form-error {
-  margin: 8px 0;
-  color: var(--color-danger);
-  font: 600 0.88rem var(--font-ui);
-}
+/* ------------------------------------------------------ landmark search -- */
 
-.form-notice {
-  margin: 8px 0;
-  color: var(--color-primary);
-  font: 600 0.88rem var(--font-ui);
-}
-
-/* ----- Landmark search results (Bet 1) ----- */
 .place-search { position: relative; }
 
 .place-search label {
   display: block;
-  margin-bottom: 4px;
-  font: 600 0.82rem var(--font-ui);
-  color: var(--color-accent);
+  margin-bottom: 6px;
+  color: var(--text-dim);
+  font-size: 0.78rem;
+  font-weight: 500;
 }
 
-.place-search input {
-  width: 100%;
-  padding: 11px 12px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  font-size: 0.98rem;
-}
-
-.place-search__hint {
-  margin: 6px 0 0;
-  color: var(--color-accent);
-  font: 400 0.82rem var(--font-ui);
-}
+.place-search__hint { margin-top: 6px; color: var(--text-faint); font-size: 0.8rem; }
 
 .place-results {
   list-style: none;
-  margin: 6px 0 0;
-  padding: 0;
-  border-top: 1px solid var(--color-border);
+  margin: 8px 0 0;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  max-height: 260px;
+  overflow-y: auto;
 }
 
-.place-results li { border-bottom: 1px solid var(--color-border); }
+.place-results li + li { border-top: 1px solid var(--hairline); }
 
 .place-results button {
   display: block;
   width: 100%;
-  padding: 11px 2px;
+  padding: 12px 10px;
   background: none;
   border: none;
   text-align: left;
   cursor: pointer;
+  border-radius: 12px;
 }
 
-.place-results__name {
-  display: block;
-  font: 600 0.98rem var(--font-ui);
-  color: var(--color-text);
-}
+.place-results button:active { background: var(--surface-2); }
+.place-results__name { display: block; font-size: 0.95rem; font-weight: 500; }
 
 .place-results__meta {
   display: flex;
   gap: 10px;
   margin-top: 3px;
-  color: var(--color-accent);
-  font: 400 0.8rem var(--font-ui);
+  color: var(--text-faint);
+  font-size: 0.76rem;
 }
 
-/* The match type is the gazetteer showing its work, so it reads as a word
-   rather than a coloured dot that means nothing on its own. */
-.place-results__match { margin-left: auto; font-weight: 600; }
+/* The gazetteer showing its work. A word, never a colour alone. */
+.place-results__match { margin-left: auto; color: var(--accent); font-weight: 600; }
 
-/* ----- Ride mode and seats (Bet 2) ----- */
-.mode-toggle {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin: 12px 0 8px;
+/* ---------------------------------------------------------- ride panels -- */
+
+.ride-summary, .ride-panel, .eta-card, .stat-card, .dialog,
+.message-picker, .share-trip, .safety-actions, .booking-panel {
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  padding: 18px;
 }
+
+.booking-panel { display: flex; flex-direction: column; gap: 14px; }
+
+.eta-card__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 9px 0;
+  font-size: 0.9rem;
+  color: var(--text-dim);
+}
+
+.eta-card__row + .eta-card__row { border-top: 1px solid var(--hairline); }
+.eta-card__row strong { color: var(--text); font-size: 1rem; font-weight: 600; }
+.eta-card__row--chosen strong { color: var(--accent); font-size: 1.25rem; font-weight: 700; }
+.eta-card__row--total strong { color: var(--text); font-size: 1.15rem; }
+.eta-card__note { margin-top: 10px; color: var(--text-faint); font-size: 0.78rem; }
+.eta-card--error { border-color: var(--danger); color: var(--danger); }
+
+/* --------------------------------------------------- mode toggle, seats -- */
+
+.mode-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 
 .mode-toggle__option {
-  padding: 11px 12px;
-  background: none;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
+  padding: 15px 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--hairline);
+  background: var(--surface-2);
   text-align: left;
   cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
 }
 
 .mode-toggle__option.is-selected {
-  border-color: var(--color-primary);
-  box-shadow: inset 0 0 0 1px var(--color-primary);
+  border-color: var(--accent);
+  background: linear-gradient(160deg, rgba(0, 230, 118, 0.14), transparent 70%);
+  box-shadow: 0 0 0 1px var(--accent) inset;
 }
 
-.mode-toggle__name {
-  display: block;
-  font: 700 0.95rem var(--font-ui);
-  color: var(--color-text);
-}
-
-.mode-toggle__note {
-  display: block;
-  margin-top: 2px;
-  color: var(--color-accent);
-  font: 400 0.78rem var(--font-ui);
-}
+.mode-toggle__name { display: block; font-size: 0.98rem; font-weight: 600; }
+.mode-toggle__note { display: block; margin-top: 3px; color: var(--text-dim); font-size: 0.76rem; }
 
 .seat-stepper {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin: 4px 0 12px;
-  font: 600 0.9rem var(--font-ui);
+  gap: 14px;
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  font-size: 0.9rem;
+  font-weight: 500;
 }
 
 .seat-stepper button {
-  width: 36px;
-  height: 36px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: none;
-  font-size: 1.15rem;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid var(--hairline-strong);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 1.2rem;
   cursor: pointer;
 }
 
-.seat-stepper button:disabled { opacity: 0.4; cursor: default; }
-.seat-stepper output { min-width: 20px; text-align: center; }
+.seat-stepper button:disabled { opacity: 0.3; cursor: default; }
+.seat-stepper output { min-width: 24px; text-align: center; font-size: 1.1rem; font-weight: 700; }
+.seat-stepper span:first-child { margin-right: auto; color: var(--text-dim); }
 
-.eta-card__row--chosen strong { color: var(--color-primary); }
+/* ------------------------------------------------------------- the PIN -- */
 
-.eta-card__row--total {
-  border-top: 1px solid var(--color-border);
-  margin-top: 6px;
-  padding-top: 6px;
-}
-
-.eta-card__note {
-  margin: 8px 0 0;
-  color: var(--color-accent);
-  font: 400 0.8rem/1.45 var(--font-ui);
-}
-
-/* ----- Outstanding balance ----- */
-.balance-banner {
-  margin: 0 0 12px;
-  padding: 10px 0;
-  border-top: 2px solid var(--color-danger);
-  border-bottom: 1px solid var(--color-border);
-  color: var(--color-text);
-  font: 600 0.9rem/1.45 var(--font-ui);
-}
-
-/* ----- Vehicle needs toggles ----- */
-.toggle-list { list-style: none; margin: 0 0 16px; padding: 0; }
-
-.toggle-list li { border-bottom: 1px solid var(--color-border); }
-
-.toggle-list label {
-  display: flex;
-  gap: 12px;
-  align-items: start;
-  padding: 12px 0;
-  cursor: pointer;
-}
-
-.toggle-list input { margin-top: 3px; width: 18px; height: 18px; }
-
-.toggle-list__name {
-  display: block;
-  font: 600 0.95rem var(--font-ui);
-}
-
-.toggle-list__note {
-  display: block;
-  margin-top: 2px;
-  color: var(--color-accent);
-  font: 400 0.82rem/1.4 var(--font-ui);
-}
-
-/* ----- The pickup PIN ----- */
+/* The one thing a kerbside impostor cannot know, so it is the biggest thing
+   on the screen. */
 .pin-display {
-  margin: 10px 0 2px;
-  font: 400 2.6rem/1 var(--font-heading);
-  letter-spacing: 0.14em;
-  color: var(--color-primary);
+  margin: 12px 0 4px;
+  font-size: 3rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  color: var(--accent);
+  text-shadow: 0 0 28px var(--accent-glow);
 }
 
-/* ----- OTP entry ----- */
-.otp-input { display: flex; gap: 10px; margin: 4px 0 8px; }
+/* ----------------------------------------------------------------- OTP -- */
+
+.otp-input { display: flex; gap: 12px; justify-content: center; }
 
 .otp-input input {
-  width: 52px;
-  height: 60px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
+  width: 60px;
+  height: 68px;
+  border-radius: var(--radius);
+  border: 1px solid var(--hairline-strong);
+  background: var(--surface);
+  color: var(--text);
   text-align: center;
-  font: 400 1.6rem var(--font-heading);
+  font-size: 1.7rem;
+  font-weight: 700;
 }
 
 .otp-input input:focus {
   outline: none;
-  border-color: var(--color-primary);
-  box-shadow: inset 0 0 0 1px var(--color-primary);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
 }
 
 .dev-otp {
-  margin: 10px 0;
-  padding: 10px 0;
-  border-top: 1px solid var(--color-border);
-  color: var(--color-accent);
-  font: 400 0.82rem/1.45 var(--font-ui);
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  border: 1px dashed var(--hairline-strong);
+  background: var(--surface);
+  color: var(--text-dim);
+  font-size: 0.8rem;
 }
 
-/* ----- Messages, sharing, cancelling ----- */
-.message-picker, .share-trip, .safety-actions {
-  margin-top: 20px;
-  padding-top: 12px;
-  border-top: 1px solid var(--color-border);
-}
+.dev-otp strong { color: var(--accent); font-size: 1rem; }
 
-.message-picker__options {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
+/* ------------------------------------------------------------ messages -- */
 
-.message-picker__options button { margin: 0; }
+.message-picker__options { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.message-picker__options button { margin: 0; font-size: 0.84rem; }
 
 .share-trip__link {
-  margin: 6px 0;
-  padding: 10px;
-  background: var(--color-surface-muted);
-  border-radius: 6px;
-  font: 400 0.8rem var(--font-ui);
+  margin: 10px 0;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--bg-elevated);
+  color: var(--text-dim);
+  font-size: 0.76rem;
   word-break: break-all;
 }
+
+/* -------------------------------------------------------------- dialog -- */
 
 .dialog {
   position: fixed;
   inset: auto 0 0;
-  max-width: 480px;
-  margin: 0 auto;
-  padding: 22px;
-  background: var(--color-surface);
-  border-top: 1px solid var(--color-border);
-  z-index: 20;
-}
-
-.dialog h2 { margin-bottom: 8px; }
-
-.dialog select {
   width: 100%;
-  padding: 10px;
-  margin: 6px 0 14px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  font: 400 0.95rem var(--font-ui);
+  max-width: var(--shell);
+  margin: 0 auto;
+  padding: 26px 20px calc(26px + env(safe-area-inset-bottom, 0px));
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  background: var(--bg-elevated);
+  border: 1px solid var(--hairline);
+  border-bottom: none;
+  z-index: 60;
+  animation: sheet-up 0.26s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.dialog__amount {
-  margin: 6px 0;
-  font: 400 2.2rem var(--font-heading);
-  color: var(--color-danger);
+@keyframes sheet-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+.dialog h2 { margin-bottom: 10px; }
+.dialog p { color: var(--text-dim); font-size: 0.9rem; margin-bottom: 8px; }
+.dialog__amount { color: var(--danger); font-size: 2.2rem; font-weight: 800; }
+
+/* ------------------------------------------------------------- balance -- */
+
+.balance-banner {
+  padding: 13px 15px;
+  border-radius: var(--radius);
+  background: rgba(255, 90, 95, 0.1);
+  border: 1px solid rgba(255, 90, 95, 0.32);
+  color: #ffc9cb;
+  font-size: 0.86rem;
 }
 
-@media (max-width: 420px) {
-  .mode-toggle, .message-picker__options { grid-template-columns: 1fr; }
-  .otp-input input { width: 46px; height: 54px; }
+/* ------------------------------------------------------- vehicle needs -- */
+
+.toggle-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+
+.toggle-list li {
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
 }
 
-/* A map that cannot draw says so, rather than leaving a grey rectangle or
-   taking the screen down with it. */
+.toggle-list label { display: flex; gap: 13px; align-items: start; padding: 15px; cursor: pointer; }
+.toggle-list input { margin-top: 2px; width: 20px; height: 20px; accent-color: var(--accent); flex: none; }
+.toggle-list__name { display: block; font-size: 0.94rem; font-weight: 500; }
+.toggle-list__note { display: block; margin-top: 3px; color: var(--text-dim); font-size: 0.79rem; }
+
+/* ------------------------------------------------------------ bottom nav -- */
+
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: var(--shell);
+  display: flex;
+  justify-content: space-around;
+  padding: 12px 16px calc(14px + env(safe-area-inset-bottom, 0px));
+  background: rgba(10, 11, 10, 0.94);
+  backdrop-filter: blur(18px);
+  border-top: 1px solid var(--hairline);
+  z-index: 50;
+}
+
+.bottom-nav a {
+  color: var(--text-faint);
+  font-size: 0.76rem;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+}
+
+.bottom-nav a.active { color: var(--accent); background: rgba(0, 230, 118, 0.1); }
+
+/* ------------------------------------------------------------ the map -- */
+
+.map-panel {
+  width: 100%;
+  min-height: 300px;
+  height: clamp(300px, 46vh, 520px);
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--hairline);
+  background: var(--bg-elevated);
+}
+
+.map-panel > div { height: 100%; }
+
 .map-placeholder {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 6px;
+  gap: 8px;
   height: 100%;
-  min-height: 260px;
-  padding: 22px;
-  background: var(--color-surface-muted);
-  border: 1px dashed var(--color-border);
-  border-radius: 10px;
+  min-height: 300px;
+  padding: 24px;
+  border-radius: var(--radius-lg);
+  background:
+    repeating-linear-gradient(0deg, transparent 0 26px, var(--hairline) 26px 27px),
+    repeating-linear-gradient(90deg, transparent 0 26px, var(--hairline) 26px 27px),
+    var(--bg-elevated);
 }
 
-.map-placeholder__title {
-  margin: 0;
-  font: 400 1.2rem var(--font-heading);
-  color: var(--color-text);
+.map-placeholder__title { font-size: 1.05rem; font-weight: 600; }
+.map-placeholder__note { max-width: 44ch; color: var(--text-dim); font-size: 0.83rem; }
+.map-placeholder__coords { color: var(--text-faint); font-size: 0.76rem; }
+
+/* ------------------------------------------------------------ history -- */
+
+.history-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
+
+.history-list li {
+  padding: 15px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  font-size: 0.9rem;
 }
 
-.map-placeholder__note {
-  margin: 0;
-  max-width: 46ch;
-  color: var(--color-accent);
-  font: 400 0.85rem/1.5 var(--font-ui);
+/* --------------------------------------------------------------- stats -- */
+
+.stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.stat-card { padding: 16px 12px; text-align: center; }
+.stat-value { font-size: 1.5rem; font-weight: 800; color: var(--accent); }
+.stat-label { margin-top: 4px; color: var(--text-dim); font-size: 0.72rem; }
+
+/* --------------------------------------------------------------- admin -- */
+
+.admin-layout { display: flex; min-height: 100vh; background: var(--bg); }
+
+.admin-sidebar {
+  width: 210px;
+  padding: 24px 14px;
+  background: var(--bg-elevated);
+  border-right: 1px solid var(--hairline);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
-.map-placeholder__coords {
-  margin: 0;
-  color: var(--color-accent);
-  font: 400 0.78rem var(--font-ui);
+.admin-sidebar h2 { margin-bottom: 14px; }
+.admin-sidebar a { color: var(--text-dim); padding: 10px 12px; border-radius: 12px; font-size: 0.88rem; }
+.admin-sidebar a.active { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+
+.admin-table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+.admin-table th, .admin-table td { padding: 12px; text-align: left; border-bottom: 1px solid var(--hairline); }
+.admin-table th { color: var(--text-dim); font-weight: 500; font-size: 0.76rem; }
+
+/* Wordmark left, language right. A row, not a bar: no fill, no border. */
+.splash__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 28px;
 }
+
+.splash__top .wordmark { margin-bottom: 0; }
+
+/* A word, not a glyph. A bare dot after a label reads as a typo. */
+.admin-sidebar a.is-unbuilt { display: flex; align-items: baseline; gap: 8px; }
+.admin-sidebar__todo { color: var(--text-faint); font-size: 0.68rem; }
+
+/* Sits under the links, not in a box. It is a footnote about the nav above
+   it, so it reads as one. */
+.admin-sidebar__note {
+  margin-top: 20px;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--text-faint);
+}
+
+/* Tabs are the query, so they read as a choice rather than as controls: a
+   hairline under the row, weight and colour on the active one, no pills. */
+.admin-tabs {
+  display: flex;
+  gap: 18px;
+  border-bottom: 1px solid var(--hairline);
+  margin-bottom: 20px;
+}
+
+.admin-tabs button {
+  background: none;
+  border: 0;
+  padding: 0 0 10px;
+  margin-bottom: -1px;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 0.86rem;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+
+.admin-tabs button.is-active {
+  color: var(--text);
+  font-weight: 600;
+  border-bottom-color: var(--accent);
+}
+
+.admin-table td .secondary-button { padding: 6px 12px; font-size: 0.78rem; margin-right: 8px; }
+
+/* --------------------------------------------------------------- legal -- */
+
+.legal-page p { color: var(--text-dim); max-width: 64ch; margin-bottom: 10px; }
+.legal-page h3 { margin: 22px 0 8px; }
+.legal-links { display: flex; gap: 16px; flex-wrap: wrap; font-size: 0.85rem; }
+
+/* --------------------------------------------------------- small phones -- */
+
+@media (max-width: 400px) {
+  .app-shell { padding: 18px 15px calc(92px + env(safe-area-inset-bottom, 0px)); }
+  .mode-toggle, .message-picker__options { grid-template-columns: 1fr; }
+  .otp-input input { width: 52px; height: 60px; font-size: 1.5rem; }
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* Respect a user who has asked for less motion. The beacon and the sheet are
+   decoration; nothing depends on them. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+/* =========================================================== the beacon ===
+   Drawn to match what matching actually does: widening rings at 2, 4 and 6 km.
+   A passenger can see the search growing rather than a spinner that says
+   nothing. See features/shared/components/SearchBeacon.jsx. */
+
+.beacon { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 26px 0; }
+
+.beacon__stage {
+  position: relative;
+  width: 210px;
+  height: 210px;
+  display: grid;
+  place-items: center;
+}
+
+.beacon__ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px solid var(--accent);
+  opacity: 0;
+  animation: beacon-ring 3s cubic-bezier(0.2, 0.6, 0.3, 1) infinite;
+}
+
+.beacon__ring--2 { animation-delay: 1s; }
+.beacon__ring--3 { animation-delay: 2s; }
+
+@keyframes beacon-ring {
+  0%   { transform: scale(0.24); opacity: 0.9; }
+  70%  { opacity: 0.16; }
+  100% { transform: scale(1); opacity: 0; }
+}
+
+.beacon__sweep {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  animation: beacon-sweep 3s linear infinite;
+}
+
+@keyframes beacon-sweep { to { transform: rotate(360deg); } }
+
+/* The vehicle at the centre: a steady point the rings radiate from. */
+.beacon__core {
+  position: relative;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 7px rgba(0, 230, 118, 0.16), 0 0 26px var(--accent-glow);
+  animation: beacon-core 2s ease-in-out infinite;
+}
+
+@keyframes beacon-core {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.14); }
+}
+
+/* Drivers, fading in as the sweep reaches them. */
+.beacon__blip {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--text);
+  opacity: 0;
+  animation: beacon-blip 3s ease-in-out infinite;
+}
+
+.beacon__blip--a { top: 30%; left: 26%; animation-delay: 0.5s; }
+.beacon__blip--b { top: 64%; left: 68%; animation-delay: 1.4s; }
+.beacon__blip--c { top: 24%; left: 70%; animation-delay: 2.3s; }
+
+@keyframes beacon-blip {
+  0%, 60% { opacity: 0; transform: scale(0.6); }
+  70%     { opacity: 1; transform: scale(1); }
+  100%    { opacity: 0; transform: scale(1); }
+}
+
+.beacon__label { font-size: 1.05rem; font-weight: 600; }
+.beacon__detail { color: var(--text-dim); font-size: 0.85rem; }
+
+/* =========================================================== the splash ===
+   First screen a jury sees, so it leads with the two bets rather than a logo
+   on an empty page. */
+
+.splash {
+  justify-content: center;
+  gap: 26px;
+  position: relative;
+  overflow: hidden;
+}
+
+.splash__glow {
+  position: absolute;
+  top: -22%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 420px;
+  height: 420px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--accent-glow), transparent 66%);
+  pointer-events: none;
+  animation: splash-breathe 7s ease-in-out infinite;
+}
+
+@keyframes splash-breathe {
+  0%, 100% { opacity: 0.55; transform: translateX(-50%) scale(1); }
+  50%      { opacity: 0.9;  transform: translateX(-50%) scale(1.09); }
+}
+
+.splash__mark { display: flex; align-items: center; gap: 12px; }
+.splash__mark svg { width: 42px; height: 42px; }
+
+.splash__mark span {
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+}
+
+/* The three staged elements settle in sequence rather than all at once, which
+   is what makes an entrance read as intentional. */
+.splash__copy, .splash__points, .splash .primary-button {
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.splash.is-ready .splash__copy   { opacity: 1; transform: none; transition-delay: 0.05s; }
+.splash.is-ready .splash__points { opacity: 1; transform: none; transition-delay: 0.16s; }
+.splash.is-ready .primary-button { opacity: 1; transform: none; transition-delay: 0.28s; }
+
+.splash__accent { color: var(--accent); }
+
+.splash__points { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+
+.splash__points li {
+  display: flex;
+  gap: 13px;
+  align-items: start;
+  padding: 14px 15px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+}
+
+.splash__icon { color: var(--accent); display: grid; place-items: center; flex: none; margin-top: 1px; }
+.splash__points strong { display: block; font-size: 0.9rem; font-weight: 600; }
+.splash__points span span, .splash__points > li > span > span { display: block; margin-top: 2px; color: var(--text-dim); font-size: 0.78rem; }
+
+/* ====================================================== the voice guide ===
+   Speaks the server's own announcement strings. Off by default: a phone that
+   talks unprompted in a shared taxi announces that you need it to. */
+
+.voice-guide {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 13px 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--hairline);
+  background: var(--surface);
+  color: var(--text-dim);
+  font-size: 0.88rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.voice-guide.is-on {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: linear-gradient(160deg, rgba(0, 230, 118, 0.12), transparent 70%);
+}
+
+.voice-guide__icon { display: grid; place-items: center; width: 22px; height: 22px; flex: none; }
+.voice-guide__icon svg { width: 22px; height: 22px; }
+
+/* A quiet ride is a request about the journey, so it reads as a statement on
+   the driver's screen rather than a badge that needs decoding. */
+.quiet-ride-notice {
+  padding: 12px 15px;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  border-left: 2px solid var(--accent);
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+/* ==================================================== brand primitives ====
+   Lifted from the reference screens rather than invented, so a screen built
+   later looks like one built today. Every one of these appears on more than
+   one screen in the set, which is the test for whether it belongs here. */
+
+/* The wordmark: mark plus letterspaced name. */
+.wordmark { display: flex; align-items: center; gap: 11px; }
+.wordmark svg { width: 30px; height: 30px; flex: none; }
+
+.wordmark span {
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.34em;
+}
+
+/* Two-tone headline: one white line, one lime. Used on the splash and on
+   every marketing surface. */
+.headline { font-size: clamp(1.9rem, 8vw, 2.5rem); font-weight: 700; letter-spacing: -0.03em; line-height: 1.1; }
+.headline em { display: block; font-style: normal; color: var(--accent); }
+
+/* Circular icon button: back, call, message. Always 44px so it is a real
+   touch target on a phone. */
+.icon-button {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--hairline-strong);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  flex: none;
+}
+
+.icon-button svg { width: 20px; height: 20px; }
+.icon-button--accent { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+
+/* Quick destinations: Home / Work / Airport. */
+.place-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+
+.place-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 8px;
+  border-radius: var(--radius);
+  border: 1px solid var(--hairline);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.place-tile svg { width: 20px; height: 20px; color: var(--text-dim); }
+.place-tile:active { background: var(--surface-2); }
+
+/* A ride option: name, one line of description, price on the right, seats.
+   The selected one takes a lime border, never a fill, so the price stays
+   readable. */
+.ride-option {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  width: 100%;
+  padding: 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--hairline);
+  background: var(--surface);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.ride-option.is-selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.ride-option__body { flex: 1; min-width: 0; }
+.ride-option__name { display: block; font-size: 0.98rem; font-weight: 600; }
+.ride-option__note { display: block; margin-top: 2px; color: var(--text-dim); font-size: 0.77rem; }
+
+.ride-option__price { text-align: right; flex: none; }
+.ride-option__price small { display: block; color: var(--text-faint); font-size: 0.65rem; letter-spacing: 0.1em; }
+.ride-option__price strong { font-size: 1.05rem; font-weight: 700; }
+.ride-option__seats { margin-top: 3px; color: var(--text-faint); font-size: 0.72rem; }
+
+/* Bottom sheet with a grab handle, the shape every reference screen uses for
+   anything that sits over a map. */
+.sheet {
+  margin-top: -22px;
+  padding: 20px;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  background: var(--bg-elevated);
+  border: 1px solid var(--hairline);
+  border-bottom: none;
+  position: relative;
+}
+
+.sheet::before {
+  content: '';
+  position: absolute;
+  top: 9px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 38px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--hairline-strong);
+}
+
+.sheet > :first-child { margin-top: 10px; }
+
+/* A row of facts: icon, label, value, chevron. The completed-ride screen. */
+.fact-row {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 15px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+}
+
+.fact-row__icon { color: var(--accent); display: grid; place-items: center; flex: none; }
+.fact-row__icon svg { width: 20px; height: 20px; }
+.fact-row__body { flex: 1; min-width: 0; }
+.fact-row__label { display: block; color: var(--text-dim); font-size: 0.76rem; }
+.fact-row__value { display: block; margin-top: 1px; font-size: 0.98rem; font-weight: 600; }
+
+/* The driver, once assigned. */
+.driver-card { display: flex; align-items: center; gap: 13px; }
+
+.driver-card__avatar {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  display: grid;
+  place-items: center;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--accent);
+  flex: none;
+}
+
+.driver-card__body { flex: 1; min-width: 0; }
+.driver-card__role { color: var(--text-dim); font-size: 0.74rem; }
+.driver-card__name { font-size: 1.02rem; font-weight: 600; }
+.driver-card__rating { color: var(--text-dim); font-size: 0.78rem; }
+
+.plate-chip {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 7px;
+  border: 1px solid var(--hairline-strong);
+  background: var(--surface-2);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+/* Arrival progress: a bar that fills, under a large ETA. */
+.eta-block { padding: 15px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--hairline); }
+.eta-block__label { color: var(--text-dim); font-size: 0.74rem; }
+.eta-block__value { font-size: 1.5rem; font-weight: 700; }
+
+.eta-block__bar { margin-top: 10px; height: 4px; border-radius: 2px; background: var(--surface-2); overflow: hidden; }
+
+.eta-block__fill {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--accent);
+  transition: width 0.6s ease;
+}
+
+/* The completed-ride confirmation. */
+.done-mark {
+  width: 74px;
+  height: 74px;
+  margin: 0 auto;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+  animation: done-pop 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.done-mark svg { width: 34px; height: 34px; }
+
+@keyframes done-pop {
+  from { transform: scale(0.6); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+
+/* ====================================================== needs and language */
+
+.lang-toggle { display: inline-flex; gap: 4px; padding: 3px; border-radius: var(--radius-pill); background: var(--surface-2); }
+
+.lang-toggle button {
+  padding: 7px 15px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--text-dim);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.lang-toggle button.is-selected { background: var(--accent); color: var(--accent-ink); }
+
+.profile-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 15px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  font-size: 0.92rem;
+}
+
+.needs-picker {
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  padding: 4px 14px 14px;
+}
+
+.needs-picker__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 0;
+  background: none;
+  border: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.needs-picker__title { display: block; font-size: 0.94rem; font-weight: 600; }
+.needs-picker__count { display: block; margin-top: 2px; color: var(--text-dim); font-size: 0.78rem; }
+
+.needs-picker__chevron {
+  color: var(--text-dim);
+  font-size: 1.5rem;
+  line-height: 1;
+  transition: transform 0.2s ease;
+}
+
+.needs-picker__chevron.is-open { transform: rotate(90deg); }
+
+/* Said plainly rather than hidden: a request that narrows the driver pool may
+   mean a slightly longer wait, and the passenger should know why. */
+.needs-picker__gate {
+  display: block;
+  margin-top: 5px;
+  color: var(--accent);
+  font-size: 0.72rem;
+}
+
+.needs-picker__note {
+  width: 100%;
+  margin-top: 10px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--hairline);
+  background: var(--bg-elevated);
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+/* What the driver sees: instructions, not labels. A driver reading more
+
+
+/* ==================================================== needs and language ==*/
+
+.lang-toggle {
+  display: inline-flex;
+  gap: 4px;
+  padding: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+}
+
+.lang-toggle button {
+  padding: 7px 15px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--text-dim);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.lang-toggle button.is-selected { background: var(--accent); color: var(--accent-ink); }
+
+.profile-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 15px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  font-size: 0.92rem;
+}
+
+.needs-picker {
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  padding: 4px 14px 14px;
+}
+
+.needs-picker__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 0;
+  background: none;
+  border: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.needs-picker__title { display: block; font-size: 0.94rem; font-weight: 600; }
+
+.needs-picker__count {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-dim);
+  font-size: 0.78rem;
+}
+
+.needs-picker__chevron {
+  color: var(--text-dim);
+  font-size: 1.5rem;
+  line-height: 1;
+  transition: transform 0.2s ease;
+}
+
+.needs-picker__chevron.is-open { transform: rotate(90deg); }
+
+/* Said plainly rather than hidden: a request that narrows the driver pool can
+   mean a slightly longer wait, and the passenger should know why. */
+.needs-picker__gate {
+  display: block;
+  margin-top: 5px;
+  color: var(--accent);
+  font-size: 0.72rem;
+}
+
+.needs-picker__note {
+  width: 100%;
+  margin-top: 10px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--hairline);
+  background: var(--bg-elevated);
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+/* What the driver sees: instructions, not labels. A label leaves them to work
+   out what to do; an instruction already says it. */
+.driver-needs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+
+.driver-needs li {
+  padding: 13px 15px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border-left: 2px solid var(--accent);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.driver-needs__note {
+  padding: 13px 15px;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 0.88rem;
+}
+
+.undertakings { list-style: none; margin: 12px 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
+
+.undertakings li {
+  display: flex;
+  gap: 10px;
+  color: var(--text-dim);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.undertakings li::before { content: '\2713'; color: var(--accent); flex: none; }
+
+
+/* ================================================= headers and the home ==*/
+
+.page-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 4px;
+}
+
+.page-header__titles { flex: 1; min-width: 0; }
+.page-header__titles h1 { font-size: 1.35rem; }
+.page-header__titles .eyebrow { margin-bottom: 2px; }
+
+/* The bell, sized and coloured like the rest of the icon set rather than
+   inheriting whatever the platform's emoji font decides. */
+.notification-bell {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--hairline);
+  background: var(--surface);
+  color: var(--text);
+  flex: none;
+}
+
+.notification-bell svg { width: 21px; height: 21px; }
+
+.notification-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  border: 2px solid var(--bg);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 0.62rem;
+  font-weight: 700;
+}
+
+/* The primary action on the home screen, so it reads as a field rather than
+   as a link and sits above everything else. */
+.home-search {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 17px 18px;
+  border-radius: var(--radius);
+  border: 1px solid var(--hairline-strong);
+  background: var(--surface);
+  color: var(--text-dim);
+  font-size: 0.98rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.home-search svg { color: var(--accent); flex: none; }
+.home-search:active { background: var(--surface-2); }
+
+.recent-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+
+.recent-list button {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  width: 100%;
+  padding: 14px 15px;
+  border-radius: var(--radius);
+  border: 1px solid var(--hairline);
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.recent-list button:active { background: var(--surface-2); }
+.recent-list__icon { color: var(--text-dim); display: grid; place-items: center; flex: none; }
+.recent-list__body { flex: 1; min-width: 0; }
+
+.recent-list__label {
+  display: block;
+  font-size: 0.94rem;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-list__fare { display: block; margin-top: 2px; color: var(--text-dim); font-size: 0.78rem; }
+.recent-list svg:last-child { color: var(--text-faint); flex: none; }
+
+
+/* ================================================ driver duty and offers ==*/
+
+.duty-toggle {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  width: 100%;
+  padding: 17px 18px;
+  border-radius: var(--radius);
+  border: 1px solid var(--hairline-strong);
+  background: var(--surface);
+  color: var(--text-dim);
+  font-size: 0.92rem;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+
+.duty-toggle.is-on {
+  border-color: var(--accent);
+  color: var(--text);
+  background: linear-gradient(160deg, rgba(197, 248, 42, 0.12), transparent 70%);
+}
+
+.duty-toggle__dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--text-faint);
+  flex: none;
+}
+
+/* A pulsing dot is the one place motion earns its keep here: it is the
+   difference between "the app is on" and "you are visible to passengers". */
+.duty-toggle.is-on .duty-toggle__dot {
+  background: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-glow);
+  animation: duty-pulse 2s ease-in-out infinite;
+}
+
+@keyframes duty-pulse {
+  0%, 100% { box-shadow: 0 0 0 3px var(--accent-glow); }
+  50%      { box-shadow: 0 0 0 8px rgba(197, 248, 42, 0.08); }
+}
+
+.offer-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+
+.offer-list button {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  width: 100%;
+  padding: 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--hairline);
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.offer-list button:active { background: var(--surface-2); }
+
+.offer-list__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.offer-list__fare { font-size: 1.2rem; font-weight: 700; color: var(--accent); }
+
+.offer-list__mode {
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--text-dim);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.offer-list__leg {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--text-dim);
+  font-size: 0.86rem;
+}
+
+.offer-list__leg svg { color: var(--accent); flex: none; }
+.offer-list__meta { color: var(--text-faint); font-size: 0.76rem; }
+
+/* An empty list should say why it is empty and what to do, never just sit
+   there being blank. */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 34px 24px;
+  border-radius: var(--radius-lg);
+  border: 1px dashed var(--hairline-strong);
+  background: var(--bg-elevated);
+  text-align: center;
+}
+
+.empty-state svg { color: var(--text-faint); }
+.empty-state p { color: var(--text-dim); font-size: 0.88rem; max-width: 34ch; }

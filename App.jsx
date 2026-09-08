@@ -1,5 +1,4 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { MockAuthProvider } from './features/shared/context/MockAuthContext';
 import { NotificationProvider } from './features/shared/context/NotificationContext';
 import DevIndex from './features/shared/pages/DevIndex';
 
@@ -41,11 +40,14 @@ import ReportsPage from './features/admin/pages/ReportsPage';
 
 export default function App() {
   return (
-    <MockAuthProvider>
       <NotificationProvider>
         <BrowserRouter>
           <Routes>
-          <Route path="/" element={<DevIndex />} />
+          {/* The app opens on its own splash, not the developer index. A
+              screen titled "dev only" is the first thing a jury would see
+              otherwise. The index is still reachable at /dev. */}
+          <Route path="/" element={<SplashPage />} />
+          <Route path="/dev" element={<DevIndex />} />
 
           <Route path="/splash" element={<SplashPage />} />
           <Route path="/login" element={<LoginPage />} />
@@ -85,6 +87,5 @@ export default function App() {
           </Routes>
         </BrowserRouter>
       </NotificationProvider>
-    </MockAuthProvider>
   );
 }

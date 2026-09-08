@@ -58,6 +58,12 @@ class Settings(BaseSettings):
     refresh_token_ttl_s: int = 2592000
 
     allowed_country_codes: str = "237"
+    # SMS delivery through an Android handset running HTTPSMS. Both must be
+    # set for the real sender to be selected; either missing falls back to the
+    # console sender, which is the honest default rather than a silent no-op.
+    httpsms_api_key: SecretStr | None = None
+    httpsms_from_number: str | None = None
+
     allow_test_numbers: bool = False
     test_number_prefix: str = "+23760000000"
 

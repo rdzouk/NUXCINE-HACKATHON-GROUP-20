@@ -1,26 +1,18 @@
-import { useMockAuth } from '../../shared/context/MockAuthContext';
-import Sidebar from '../components/Sidebar';
+import NotBuilt from '../components/NotBuilt';
+import { getLocale } from '../../shared/services/locale';
 
 export default function RidesPage() {
-  const { adminRides } = useMockAuth();
+  const en = getLocale() === 'en';
 
   return (
-    <div className="admin-layout">
-      <Sidebar />
-      <main className="app-shell">
-        <h1>Rides</h1>
-        <table className="admin-table">
-          <thead><tr><th>ID</th><th>Passenger</th><th>Driver</th><th>Status</th><th>Fare</th></tr></thead>
-          <tbody>
-            {adminRides.map((r) => (
-              <tr key={r.id}>
-                <td>{r.id}</td><td>{r.passenger}</td><td>{r.driver}</td>
-                <td>{r.status}</td><td>{r.fareXaf.toLocaleString()} FCFA</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </main>
-    </div>
+    <NotBuilt
+      title={en ? 'Rides' : 'Courses'}
+      endpoint="GET /admin/rides"
+      note={
+        en
+          ? 'A ride carries both parties and a fare, so an operator-wide listing is a privacy decision before it is a feature. It would need a documented retention window and a reason recorded per lookup.'
+          : "Une course porte les deux parties et un tarif, donc une liste a l'echelle de la plateforme est une decision de confidentialite avant d'etre une fonctionnalite. Il faudrait une duree de conservation documentee et un motif enregistre a chaque consultation."
+      }
+    />
   );
 }

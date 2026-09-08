@@ -289,14 +289,17 @@ class OtpPeekResponse(VoraModel):
     ),
 )
 async def peek_otp(phone: str) -> OtpPeekResponse:
-    from app.services.sms import ConsoleSmsSender, get_sms_sender
+    from app.services.sms import get_sms_sender
 
     sender = get_sms_sender()
-    if not isinstance(sender, ConsoleSmsSender):
-        # A real gateway is wired, so nothing here ever saw the code.
+
+    # Both the console sender and the routing sender expose peek(); a real
+    # gateway on its own does not, because nothing there ever saw the code.
+    peek = getattr(sender, "peek", None)
+    if peek is None:
         return OtpPeekResponse(phone=phone, code=None)
 
-    return OtpPeekResponse(phone=phone, code=sender.peek(phone))
+    return OtpPeekResponse(phone=phone, code=peek(phone))
 
 
 def is_enabled() -> bool:

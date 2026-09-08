@@ -18,6 +18,7 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, status
+from sqlalchemy import text
 
 from app.api.v1._stub import COMMON_ERRORS, PUBLIC_ERRORS
 from app.api.v1.rides import _render as render_ride
@@ -34,10 +35,12 @@ from app.schemas.driver import (
     KycDocumentResponse,
     KycStatusResponse,
     OfferAcceptResponse,
+    RideNeedInfo,
+    RideNeedsResponse,
     VehicleCapabilitiesResponse,
 )
 from app.schemas.user import KycStatus
-from app.services import accessibility, matching
+from app.services import accessibility, matching, ride_needs
 from app.services import kyc as kyc_service
 from app.services import matching as offers_service
 
@@ -80,10 +83,47 @@ async def go_online(
     driver.is_online = True
     driver.seats_free = payload.seats_free
     driver.went_online_at = datetime.now(UTC)
+
+    # Write the position, not just the flag.
+    #
+    # This was missing, and the effect was that going online did nothing
+    # matchable. `find_candidates` selects from `driver_presence` and discards
+    # anything older than PRESENCE_MAX_AGE_S, so a driver who flipped online
+    # without a fresh position was invisible to the matcher forever: online on
+    # their own screen, never offered a single ride, with nothing to explain
+    # it. The request already carries the coordinates; they simply were not
+    # being stored.
+    #
+    # Upserted because a driver has exactly one presence row, and going online
+    # a second time must move the pin rather than fail on the primary key.
+    await session.execute(
+        text(
+            "INSERT INTO driver_presence "
+            "  (driver_id, geom, heading, recorded_at) "
+            "VALUES "
+            "  (:driver_id, ST_MakePoint(:lng, :lat)::geography, :heading, now()) "
+            "ON CONFLICT (driver_id) DO UPDATE SET "
+            "  geom = EXCLUDED.geom, "
+            "  heading = EXCLUDED.heading, "
+            "  recorded_at = EXCLUDED.recorded_at, "
+            "  is_stale = false"
+        ),
+        {
+            "driver_id": driver.id,
+            "lat": payload.lat,
+            "lng": payload.lng,
+            "heading": payload.heading,
+        },
+    )
+
     await session.commit()
     await session.refresh(driver)
 
-    logger.info("driver_online", driver_id=str(driver.id), seats_free=payload.seats_free)
+    logger.info(
+        "driver_online",
+        driver_id=str(driver.id),
+        seats_free=payload.seats_free,
+    )
     return _presence(driver)
 
 
@@ -190,6 +230,51 @@ async def decline_offer(
 )
 async def list_capabilities() -> VehicleCapabilitiesResponse:
     return VehicleCapabilitiesResponse(capabilities=accessibility.CAPABILITIES)
+
+
+@router.get(
+    # Not /rides/needs: that is matched by /rides/{ride_id} with the id
+    # "needs", so it would demand authentication and 401. Relying on
+    # router ordering to disambiguate is a trap for whoever reorders them
+    # next, so the path is distinct instead.
+    "/ride-needs",
+    response_model=RideNeedsResponse,
+    responses=PUBLIC_ERRORS,
+    summary="What a passenger can ask for on a ride",
+    description=(
+        "Drives the request picker, and carries the wording so a phrasing "
+        "correction is a server change rather than an app release.\n\n"
+        "Every entry is a **need**, meaning something the driver does. None is "
+        "a record of anything about a person: a tall passenger, a passenger "
+        "who gets carsick and a passenger with a mobility impairment all "
+        "select the same option and the system cannot tell them apart. Law "
+        "2024/017 prohibits processing health data, and this is what that "
+        "looks like in practice (I9).\n\n"
+        "`undertakings_*` is the text a driver signs before being offered a "
+        "ride carrying any of these. Without it a passenger would be relying "
+        "on behaviour nobody agreed to, and could be surcharged for asking."
+    ),
+)
+async def list_ride_needs() -> RideNeedsResponse:
+    return RideNeedsResponse(
+        needs=[
+            RideNeedInfo(
+                key=info.key.value,
+                label_fr=info.label_fr,
+                label_en=info.label_en,
+                driver_action_fr=info.driver_action_fr,
+                driver_action_en=info.driver_action_en,
+                requires_undertaking=(
+                    info.key in ride_needs.NEEDS_REQUIRING_UNDERTAKING
+                ),
+                vehicle_capability=info.vehicle_capability,
+            )
+            for info in ride_needs.NEEDS
+        ],
+        undertakings_fr=ride_needs.UNDERTAKINGS_FR,
+        undertakings_en=ride_needs.UNDERTAKINGS_EN,
+        undertakings_version=ride_needs.UNDERTAKINGS_VERSION,
+    )
 
 
 

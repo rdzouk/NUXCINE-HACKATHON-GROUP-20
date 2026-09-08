@@ -1,28 +1,18 @@
-import { useMockAuth } from '../../shared/context/MockAuthContext';
-import Sidebar from '../components/Sidebar';
+import NotBuilt from '../components/NotBuilt';
+import { getLocale } from '../../shared/services/locale';
 
 export default function UsersPage() {
-  const { adminUsers } = useMockAuth();
+  const en = getLocale() === 'en';
 
   return (
-    <div className="admin-layout">
-      <Sidebar />
-      <main className="app-shell">
-        <h1>Users</h1>
-        <table className="admin-table">
-          <thead><tr><th>Name</th><th>Role</th><th>Status</th><th></th></tr></thead>
-          <tbody>
-            {adminUsers.map((u) => (
-              <tr key={u.id}>
-                <td>{u.name}</td><td>{u.role}</td><td>{u.status}</td>
-                <td><button className="secondary-button">
-                  {u.status === 'active' ? 'Suspend' : 'Activate'}
-                </button></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </main>
-    </div>
+    <NotBuilt
+      title={en ? 'Users' : 'Utilisateurs'}
+      endpoint="GET /admin/users, POST /admin/users/{id}/status"
+      note={
+        en
+          ? 'Suspending an account is a real power and would need an audit row per decision, the same way the KYC decision already writes one. It was not worth shipping half.'
+          : "Suspendre un compte est un pouvoir reel et exigerait une ligne d'audit par decision, comme le fait deja la decision KYC. Cela ne valait pas la peine d'en livrer la moitie."
+      }
+    />
   );
 }

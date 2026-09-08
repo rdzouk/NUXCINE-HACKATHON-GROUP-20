@@ -1,3 +1,7 @@
+> **This is not the VORA backend.** It is a draft SMS gateway proposal,
+> kept for history. The application runs from the repository root: see
+> [../README.md](../README.md) and [../DEMARRAGE.md](../DEMARRAGE.md).
+
 # VORA local backend
 
 ## Run the local API
