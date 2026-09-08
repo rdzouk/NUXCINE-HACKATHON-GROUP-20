@@ -26,6 +26,7 @@ from __future__ import annotations
 import uuid
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -114,7 +115,31 @@ async def submit_document(
             reference, key=settings.kyc_encryption_key.get_secret_value()
         )
 
-    await session.flush()
+    try:
+        await session.flush()
+    except IntegrityError as exc:
+        # The unique constraint on drivers.cni_ref_hash fired: this identity
+        # document is already registered to another driver account.
+        #
+        # That constraint is doing its job. §4.2 makes the CNI hash the ban
+        # surface precisely so a suspended driver cannot re-register under a
+        # new phone number, and enforcing it in the database means application
+        # code cannot forget to check.
+        #
+        # What was wrong was the response. An unhandled IntegrityError is a
+        # 500, which tells an honest driver with a mistyped number that the
+        # service is broken, and tells a dishonest one nothing useful either.
+        await session.rollback()
+        logger.warning(
+            "kyc_duplicate_document",
+            driver_id=str(driver.id),
+            kind=kind.value,
+        )
+        raise VoraError(
+            ErrorCode.KYC_DOCUMENT_ALREADY_REGISTERED,
+            details={"kind": kind.value},
+        ) from exc
+
     logger.info("kyc_document_submitted", driver_id=str(driver.id), kind=kind.value)
     return document
 

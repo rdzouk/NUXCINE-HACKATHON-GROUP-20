@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useMockAuth } from '../../../app/MockAuthContext';
+import { useMockAuth } from '../../shared/context/MockAuthContext';
 
 export default function RideCompletedPage() {
   const { ride } = useMockAuth();

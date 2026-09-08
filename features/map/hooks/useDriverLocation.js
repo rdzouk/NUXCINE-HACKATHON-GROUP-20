@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { wsBaseUrl } from '../../shared/services/wsUrl';
 
 // Connects to WS /ws/passenger with first-frame auth from the integration contract.
 export function useDriverLocation(rideId) {
@@ -9,7 +10,7 @@ export function useDriverLocation(rideId) {
     if (!rideId) return;
 
     const token = localStorage.getItem('access_token');
-    const ws = new WebSocket(`${import.meta.env.VITE_WS_BASE_URL}/ws/passenger`);
+    const ws = new WebSocket(`${wsBaseUrl()}/ws/passenger`);
     wsRef.current = ws;
 
     ws.onopen = () => {

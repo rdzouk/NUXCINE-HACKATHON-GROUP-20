@@ -263,6 +263,42 @@ async def realtime_stats() -> dict:
     return await get_registry().stats()
 
 
+class OtpPeekResponse(VoraModel):
+    phone: str
+    code: str | None = Field(
+        default=None,
+        description="The last code sent to this number by this process.",
+    )
+
+
+@router.get(
+    "/otp/{phone}",
+    response_model=OtpPeekResponse,
+    responses=COMMON_ERRORS,
+    summary="Read back the last OTP for a number (development only)",
+    description=(
+        "Returns the code the console sender last delivered to this number, so "
+        "a demo does not have to pause while somebody reads it out of the "
+        "container logs.\n\n"
+        "This exists only because there is no SMS gateway wired. It lives on "
+        "the dev router, which is not registered unless DEBUG is on and the "
+        "environment is not production, so the path does not exist on a real "
+        "deployment rather than being guarded inside the handler. Wire a real "
+        "SmsSender and this returns nothing, because the console sender is no "
+        "longer the one delivering."
+    ),
+)
+async def peek_otp(phone: str) -> OtpPeekResponse:
+    from app.services.sms import ConsoleSmsSender, get_sms_sender
+
+    sender = get_sms_sender()
+    if not isinstance(sender, ConsoleSmsSender):
+        # A real gateway is wired, so nothing here ever saw the code.
+        return OtpPeekResponse(phone=phone, code=None)
+
+    return OtpPeekResponse(phone=phone, code=sender.peek(phone))
+
+
 def is_enabled() -> bool:
     """Whether these routes may be registered at all.
 

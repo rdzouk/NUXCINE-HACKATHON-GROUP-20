@@ -36,3 +36,10 @@ osrm-data/
 .vscode/
 *.swp
 .DS_Store
+
+# Windows alternate-data-stream junk from unzipping on NTFS
+*:Zone.Identifier
+
+# The design prototype is a reference, never built or run here
+design-prototype/node_modules/
+design-prototype/dist/

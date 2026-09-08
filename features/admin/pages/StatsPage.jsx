@@ -1,4 +1,4 @@
-import { useMockAuth } from '../../../app/MockAuthContext';
+import { useMockAuth } from '../../shared/context/MockAuthContext';
 import Sidebar from '../components/Sidebar';
 
 export default function StatsPage() {

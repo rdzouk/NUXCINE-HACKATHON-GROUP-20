@@ -1,4 +1,4 @@
-import { useMockAuth } from '../../../app/MockAuthContext';
+import { useMockAuth } from '../../shared/context/MockAuthContext';
 import DriverNav from '../components/DriverNav';
 
 export default function HistoryPage() {

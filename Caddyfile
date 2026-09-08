@@ -1,4 +1,4 @@
-# Caddy fronts the API on both deployment paths.
+# Caddy fronts the whole app: the built frontend and the API, on one origin.
 #
 #   Cloudflare Tunnel (current): TLS terminates at Cloudflare's edge and
 #   cloudflared connects to this server on plain HTTP over the internal
@@ -12,6 +12,14 @@
 # Caddy applies that default only when the variable is unset, and Compose sets
 # it to an empty string. An empty site address makes this a keyless block,
 # which Caddy reads as a second global-options block and refuses to start.
+#
+# **Why one origin rather than two.** Running Vite on :5173 and the API on
+# :8080 makes every request cross-origin, so the browser sends a preflight and
+# the API has to name each front-end address in an allow-list. Open the app on
+# any address that is not on that list, a phone on the LAN or the tunnel
+# hostname, and every call fails with "Failed to fetch" before it is even sent.
+# Serving both from here means the app talks to its own origin, so there is no
+# preflight, no allow-list to maintain, and no address baked into the bundle.
 
 {
 	# The admin API is a full control plane on localhost:2019. Nothing in this
@@ -23,13 +31,39 @@
 {$CADDY_SITE_ADDRESS} {
 	encode zstd gzip
 
+	# The API and the live sockets. Matched first: a path that belongs to the
+	# backend must never fall through to the single-page app, or a mistyped
+	# endpoint would answer 200 with index.html and a client would try to parse
+	# a web page as JSON.
+	#
 	# Caddy sets X-Forwarded-For, X-Forwarded-Proto and X-Forwarded-Host on the
 	# upstream request. uvicorn runs with --proxy-headers so the app sees the
 	# real scheme and client IP, which the per-IP rate limiter in Phase 1 needs.
-	reverse_proxy api:8000 {
-		health_uri /api/v1/health
-		health_interval 15s
-		health_timeout 5s
+	@backend path /api/* /health*
+	handle @backend {
+		reverse_proxy api:8000 {
+			health_uri /api/v1/health
+			health_interval 15s
+			health_timeout 5s
+		}
+	}
+
+	# WebSockets share the upstream but need their own block with no health
+	# checking and no read timeout: a tracking socket is idle between location
+	# frames by design, and a proxy that times it out looks to the passenger
+	# like the driver stopped moving.
+	@sockets path /api/v1/ws/*
+	handle @sockets {
+		reverse_proxy api:8000
+	}
+
+	# Everything else is the app. try_files sends unknown paths to index.html so
+	# client-side routes survive a refresh or a link opened cold; without it
+	# /passenger/home is a 404 from the file server rather than a route.
+	handle {
+		root * /srv/web
+		try_files {path} /index.html
+		file_server
 	}
 
 	log {

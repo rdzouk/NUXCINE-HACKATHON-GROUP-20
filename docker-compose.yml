@@ -97,11 +97,15 @@ services:
     volumes:
       - caddy_data:/data
       - caddy_config:/config
+      # No bind mount for the frontend. It was one, and Docker Desktop rewrote
+      # ./dist to a shim path that came back empty after a host restart, so
+      # every page 404'd while dist/ sat full on the host. The build is copied
+      # into the image instead; see docker/caddy.Dockerfile.
     depends_on: [api]
     ports:
-      # Bound for the VPS path. Harmless behind a tunnel, which reaches Caddy
-      # over the internal network rather than through these.
-      - "80:80"
+      # Bound for the VPS path, and how the app is reached locally. Harmless
+      # behind a tunnel, which reaches Caddy over the internal network.
+      - "${WEB_HOST_PORT:-8090}:80"
       - "443:443"
     networks: [vora_internal]
 

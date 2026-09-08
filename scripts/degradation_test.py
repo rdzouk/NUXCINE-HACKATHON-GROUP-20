@@ -220,11 +220,25 @@ def main() -> int:
             check("health tells the truth about osrm",
                   osrm.get("status") != "ok", f"reported {osrm.get('status')}")
 
-    r = client.post(f"{base}/rides/quote", headers=auth, json=QUOTE_BODY)
+    recovered_in = None
+    started = time.monotonic()
+    for _ in range(15):
+        r = client.post(f"{base}/rides/quote", headers=auth, json=QUOTE_BODY)
+        if (
+            r.status_code == 200
+            and r.json().get("routing_source") == baseline_source
+        ):
+            recovered_in = time.monotonic() - started
+            break
+        time.sleep(2)
+
     check("routing recovers on its own once osrm is back",
-          r.status_code == 200
-          and r.json().get("routing_source") == baseline_source,
-          f"got {r.status_code}, source={r.json().get('routing_source')}")
+          recovered_in is not None,
+          f"still on the fallback after {time.monotonic() - started:.0f}s: "
+          f"{r.status_code}, source={r.json().get('routing_source')}")
+    if recovered_in is not None:
+        print(f"{DIM}  routed fares resumed {recovered_in:.0f}s after osrm "
+              f"came back{RESET}")
     print()
 
     # ---------------------------------------------------- redis down --

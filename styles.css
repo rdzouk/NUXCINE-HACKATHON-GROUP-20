@@ -356,3 +356,320 @@ button, input, textarea {
 .legal-page p { line-height: 1.6; max-width: 65ch; }
 .legal-links { display: flex; flex-wrap: wrap; gap: 12px; }
 .legal-links a { color: var(--color-primary); font: 600 0.9rem var(--font-ui); }
+
+/* ===== Tier 3 screens =====
+   Structure comes from size and weight, not from boxes inside boxes. A
+   section is a heading, a hairline and its content. Colours are the tokens
+   above; nothing here introduces a new one. */
+
+.section-note {
+  margin: 4px 0 12px;
+  color: var(--color-accent);
+  font: 400 0.85rem/1.45 var(--font-ui);
+  max-width: 52ch;
+}
+
+.form-error {
+  margin: 8px 0;
+  color: var(--color-danger);
+  font: 600 0.88rem var(--font-ui);
+}
+
+.form-notice {
+  margin: 8px 0;
+  color: var(--color-primary);
+  font: 600 0.88rem var(--font-ui);
+}
+
+/* ----- Landmark search results (Bet 1) ----- */
+.place-search { position: relative; }
+
+.place-search label {
+  display: block;
+  margin-bottom: 4px;
+  font: 600 0.82rem var(--font-ui);
+  color: var(--color-accent);
+}
+
+.place-search input {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 0.98rem;
+}
+
+.place-search__hint {
+  margin: 6px 0 0;
+  color: var(--color-accent);
+  font: 400 0.82rem var(--font-ui);
+}
+
+.place-results {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.place-results li { border-bottom: 1px solid var(--color-border); }
+
+.place-results button {
+  display: block;
+  width: 100%;
+  padding: 11px 2px;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.place-results__name {
+  display: block;
+  font: 600 0.98rem var(--font-ui);
+  color: var(--color-text);
+}
+
+.place-results__meta {
+  display: flex;
+  gap: 10px;
+  margin-top: 3px;
+  color: var(--color-accent);
+  font: 400 0.8rem var(--font-ui);
+}
+
+/* The match type is the gazetteer showing its work, so it reads as a word
+   rather than a coloured dot that means nothing on its own. */
+.place-results__match { margin-left: auto; font-weight: 600; }
+
+/* ----- Ride mode and seats (Bet 2) ----- */
+.mode-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 12px 0 8px;
+}
+
+.mode-toggle__option {
+  padding: 11px 12px;
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mode-toggle__option.is-selected {
+  border-color: var(--color-primary);
+  box-shadow: inset 0 0 0 1px var(--color-primary);
+}
+
+.mode-toggle__name {
+  display: block;
+  font: 700 0.95rem var(--font-ui);
+  color: var(--color-text);
+}
+
+.mode-toggle__note {
+  display: block;
+  margin-top: 2px;
+  color: var(--color-accent);
+  font: 400 0.78rem var(--font-ui);
+}
+
+.seat-stepper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 0 12px;
+  font: 600 0.9rem var(--font-ui);
+}
+
+.seat-stepper button {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: none;
+  font-size: 1.15rem;
+  cursor: pointer;
+}
+
+.seat-stepper button:disabled { opacity: 0.4; cursor: default; }
+.seat-stepper output { min-width: 20px; text-align: center; }
+
+.eta-card__row--chosen strong { color: var(--color-primary); }
+
+.eta-card__row--total {
+  border-top: 1px solid var(--color-border);
+  margin-top: 6px;
+  padding-top: 6px;
+}
+
+.eta-card__note {
+  margin: 8px 0 0;
+  color: var(--color-accent);
+  font: 400 0.8rem/1.45 var(--font-ui);
+}
+
+/* ----- Outstanding balance ----- */
+.balance-banner {
+  margin: 0 0 12px;
+  padding: 10px 0;
+  border-top: 2px solid var(--color-danger);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text);
+  font: 600 0.9rem/1.45 var(--font-ui);
+}
+
+/* ----- Vehicle needs toggles ----- */
+.toggle-list { list-style: none; margin: 0 0 16px; padding: 0; }
+
+.toggle-list li { border-bottom: 1px solid var(--color-border); }
+
+.toggle-list label {
+  display: flex;
+  gap: 12px;
+  align-items: start;
+  padding: 12px 0;
+  cursor: pointer;
+}
+
+.toggle-list input { margin-top: 3px; width: 18px; height: 18px; }
+
+.toggle-list__name {
+  display: block;
+  font: 600 0.95rem var(--font-ui);
+}
+
+.toggle-list__note {
+  display: block;
+  margin-top: 2px;
+  color: var(--color-accent);
+  font: 400 0.82rem/1.4 var(--font-ui);
+}
+
+/* ----- The pickup PIN ----- */
+.pin-display {
+  margin: 10px 0 2px;
+  font: 400 2.6rem/1 var(--font-heading);
+  letter-spacing: 0.14em;
+  color: var(--color-primary);
+}
+
+/* ----- OTP entry ----- */
+.otp-input { display: flex; gap: 10px; margin: 4px 0 8px; }
+
+.otp-input input {
+  width: 52px;
+  height: 60px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  text-align: center;
+  font: 400 1.6rem var(--font-heading);
+}
+
+.otp-input input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: inset 0 0 0 1px var(--color-primary);
+}
+
+.dev-otp {
+  margin: 10px 0;
+  padding: 10px 0;
+  border-top: 1px solid var(--color-border);
+  color: var(--color-accent);
+  font: 400 0.82rem/1.45 var(--font-ui);
+}
+
+/* ----- Messages, sharing, cancelling ----- */
+.message-picker, .share-trip, .safety-actions {
+  margin-top: 20px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border);
+}
+
+.message-picker__options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.message-picker__options button { margin: 0; }
+
+.share-trip__link {
+  margin: 6px 0;
+  padding: 10px;
+  background: var(--color-surface-muted);
+  border-radius: 6px;
+  font: 400 0.8rem var(--font-ui);
+  word-break: break-all;
+}
+
+.dialog {
+  position: fixed;
+  inset: auto 0 0;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 22px;
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+  z-index: 20;
+}
+
+.dialog h2 { margin-bottom: 8px; }
+
+.dialog select {
+  width: 100%;
+  padding: 10px;
+  margin: 6px 0 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font: 400 0.95rem var(--font-ui);
+}
+
+.dialog__amount {
+  margin: 6px 0;
+  font: 400 2.2rem var(--font-heading);
+  color: var(--color-danger);
+}
+
+@media (max-width: 420px) {
+  .mode-toggle, .message-picker__options { grid-template-columns: 1fr; }
+  .otp-input input { width: 46px; height: 54px; }
+}
+
+/* A map that cannot draw says so, rather than leaving a grey rectangle or
+   taking the screen down with it. */
+.map-placeholder {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  height: 100%;
+  min-height: 260px;
+  padding: 22px;
+  background: var(--color-surface-muted);
+  border: 1px dashed var(--color-border);
+  border-radius: 10px;
+}
+
+.map-placeholder__title {
+  margin: 0;
+  font: 400 1.2rem var(--font-heading);
+  color: var(--color-text);
+}
+
+.map-placeholder__note {
+  margin: 0;
+  max-width: 46ch;
+  color: var(--color-accent);
+  font: 400 0.85rem/1.5 var(--font-ui);
+}
+
+.map-placeholder__coords {
+  margin: 0;
+  color: var(--color-accent);
+  font: 400 0.78rem var(--font-ui);
+}

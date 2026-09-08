@@ -153,6 +153,31 @@ CORS origin and a weak signing secret are both rejected at boot rather than in
 review. Unhandled exceptions return a fixed envelope and never their own text,
 in every environment.
 
+### Clock skew, and the failure it produced
+
+Access tokens carry `nbf`, and PyJWT enforces it. When a clock moves backward
+under a live token, that token's `nbf` lands in the future and PyJWT raises
+`ImmatureSignatureError`, which the error map turns into **INVALID_TOKEN**.
+That is the same code returned for a bad signature, so the symptom reads as a
+forged token rather than as a clock, and it appears on a token that was
+working seconds earlier.
+
+This was not hypothetical. During Phase 7 the development host's wall clock
+was oscillating by 57 seconds, seven jumps in three minutes, measured against
+a monotonic reference. Suites failed intermittently with INVALID_TOKEN, never
+reproduced in isolation, and the user row was intact every time, which ruled
+out the obvious explanation of something deleting accounts.
+
+`decode_access_token` now allows 30 seconds of leeway on the time claims. RFC
+7519 provides for exactly this, two API instances behind a load balancer never
+agree on the second, and without it a token minted by one is refused by the
+other for as long as they differ. The leeway is small against a 900-second
+token, it is bounded by a test, and expiry past it is still refused.
+
+Leeway is the right answer for ordinary skew between machines. It is **not** a
+fix for a host whose clock is jumping by a minute, and it is not treated as
+one: that host needs its clock repaired.
+
 ## Accepted risks
 
 Recorded here rather than fixed, with the mitigation that makes each tolerable

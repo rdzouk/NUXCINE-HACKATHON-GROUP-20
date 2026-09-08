@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { requestOtp, verifyOtp } from '../services/authApi';
+import OtpInput from '../components/OtpInput';
+import { peekOtp, requestOtp, verifyOtp } from '../services/authApi';
 import { getAccessToken, getRouteForRole, getStoredUser } from '../services/session';
 
 function sanitizePhone(value) {
@@ -22,6 +23,8 @@ export default function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [noticeMessage, setNoticeMessage] = useState('');
+  const [devCode, setDevCode] = useState('');
+  const [secondsLeft, setSecondsLeft] = useState(0);
   const navigate = useNavigate();
 
   const expiresLabel = useMemo(() => {
@@ -31,6 +34,15 @@ export default function LoginPage() {
 
     return new Date(expiresAt).toLocaleTimeString();
   }, [expiresAt]);
+
+  useEffect(() => {
+    if (secondsLeft <= 0) {
+      return undefined;
+    }
+
+    const timer = setInterval(() => setSecondsLeft((n) => Math.max(0, n - 1)), 1000);
+    return () => clearInterval(timer);
+  }, [secondsLeft]);
 
   useEffect(() => {
     const token = getAccessToken();
@@ -50,8 +62,13 @@ export default function LoginPage() {
       setChallengeId(response.challenge_id);
       setExpiresAt(response.expires_at);
       setResendAfterSeconds(response.resend_after_s);
+      setSecondsLeft(response.resend_after_s ?? 0);
       setCode('');
       setNoticeMessage('Enter the code that was sent to your phone.');
+
+      // No SMS gateway is wired, so in development the server can hand
+      // the code straight back. Returns null on a real deployment.
+      setDevCode((await peekOtp(phone.trim())) ?? '');
     } catch (error) {
       setNoticeMessage('');
       setErrorMessage(error.message);
@@ -100,29 +117,19 @@ export default function LoginPage() {
         />
         {challengeId ? (
           <>
-            <input
-              placeholder="OTP code"
-              value={code}
-              onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 8))}
-              autoComplete="one-time-code"
-              inputMode="numeric"
-              disabled={isSubmitting}
-            />
-            <p>
-              Code expires at {expiresLabel}.
-              {typeof resendAfterSeconds === 'number' ? ` You can request another code after ${resendAfterSeconds} seconds.` : ''}
-            </p>
+            <OtpInput value={code} onChange={setCode} length={4} disabled={isSubmitting} />
+            <p>Code expires at {expiresLabel}.</p>
             <div className="button-row">
-              <button className="primary-button" type="submit" disabled={isSubmitting || code.trim().length < 4}>
+              <button className="primary-button" type="submit" disabled={isSubmitting || code.length < 4}>
                 {isSubmitting ? 'Verifying...' : 'Verify code'}
               </button>
               <button
                 className="secondary-button"
                 type="button"
                 onClick={handleRequestOtp}
-                disabled={isSubmitting}
+                disabled={isSubmitting || secondsLeft > 0}
               >
-                Send a new code
+                {secondsLeft > 0 ? `Send a new code in ${secondsLeft}s` : 'Send a new code'}
               </button>
             </div>
           </>
@@ -133,6 +140,14 @@ export default function LoginPage() {
         )}
       </form>
       {noticeMessage ? <p>{noticeMessage}</p> : null}
+      {devCode ? (
+        <p className="dev-otp">
+          <strong>Development code: {devCode}</strong>
+          <br />
+          No SMS gateway is wired, so the server is showing you the code it
+          would have sent. This does not exist outside development.
+        </p>
+      ) : null}
       {errorMessage ? <p>{errorMessage}</p> : null}
       <p>No account? <Link to="/signup">Sign up</Link></p>
     </main>

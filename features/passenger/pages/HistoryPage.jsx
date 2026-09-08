@@ -1,4 +1,4 @@
-import { useMockAuth } from '../../../app/MockAuthContext';
+import { useMockAuth } from '../../shared/context/MockAuthContext';
 import BottomNav from '../components/BottomNav';
 
 export default function HistoryPage() {

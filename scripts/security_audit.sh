@@ -26,7 +26,10 @@ GREEN=$'\033[32m'; RED=$'\033[31m'; YELLOW=$'\033[33m'; DIM=$'\033[2m'
 RESET=$'\033[0m'
 
 failed=0
-GITLEAKS="${GITLEAKS:-$(command -v gitleaks || echo /tmp/gitleaks)}"
+# Not /tmp: a `wsl --shutdown` wipes it, and the audit then reports
+# "gitleaks not found" as a warning, which reads like the scan was skipped
+# on purpose rather than because a binary vanished.
+GITLEAKS="${GITLEAKS:-$(command -v gitleaks 2>/dev/null || echo "$HOME/.local/bin/gitleaks")}"
 PY="${PY:-.venv/bin/python}"
 
 step() { printf '\n%s=== %s ===%s\n' "$DIM" "$1" "$RESET"; }

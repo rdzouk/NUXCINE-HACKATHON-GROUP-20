@@ -141,10 +141,19 @@ def main() -> int:
         f"{base}/rides/quote", headers=auth,
         json={"pickup": WARDA, "dropoff": CENTRAL, "seats": 1, "mode": "exclusive"},
     )
-    check("the same trip prices identically", r3.json()["fare_xaf"] == fare,
-          f"{r3.json().get('fare_xaf')} vs {fare}")
-    check("but the quote_id differs", r3.json()["quote_id"] != q["quote_id"],
-          "each quote needs its own jti or single-use enforcement breaks")
+    # Status checked before the body is read.
+    #
+    # A bare r3.json()["fare_xaf"] raises KeyError when the quote fails, and a
+    # KeyError inside a determinism check sends somebody reading the fare
+    # engine for a bug that is really a timeout from a loaded box. The status
+    # is the thing that says which.
+    if check("the repeat quote returns 200", r3.status_code == 200,
+             f"got {r3.status_code}: {r3.text[:160]}"):
+        q3 = r3.json()
+        check("the same trip prices identically", q3["fare_xaf"] == fare,
+              f"{q3.get('fare_xaf')} vs {fare}")
+        check("but the quote_id differs", q3["quote_id"] != q["quote_id"],
+              "each quote needs its own jti or single-use enforcement breaks")
     print()
 
     print("service area is enforced")

@@ -4,9 +4,23 @@
     python scripts/seed_history.py                 # 5 passengers, 20 rides
     python scripts/seed_history.py --rides 30
 
-Idempotent: reruns clear exactly the seeded passengers and rebuild them. The
-reserved `+2376000008xx` block is what makes "exactly" true, so a rerun cannot
-touch a real account or a driver seeded from the +2376000009xx block.
+Idempotent by converging, not by resetting. Passengers are upserted on their
+phone number and rides are topped up to the target count, so a rerun leaves the
+same system without deleting anything.
+
+It cannot delete, and that is the database being right rather than a
+limitation. `rides.passenger_id` is ON DELETE RESTRICT because a ride is a
+financial and legal record, and `ride_events` is append-only, so clearing
+seeded history would mean defeating I7 to make a fixture convenient.
+
+The reserved `+237600000008xxx` block keeps these rows separate from the
+drivers seeded into `+237600000009xxx`, so either can be reseeded without
+touching the other or a real account.
+
+Both sit inside the range the auth service accepts, which earlier blocks did
+not. A seeded account that cannot request an OTP cannot be logged into, so the
+whole fleet was unreachable and the driver side of the app could not be shown
+at all.
 
 **Why history exists at all.** A history screen with nothing in it demos
 nothing, and a jury reads an empty list as a feature that was not built. These
@@ -40,9 +54,11 @@ from app.db import dispose_engine, get_sessionmaker
 from app.security import hashing
 from app.services.fare import DEFAULT_FARE_CONFIG, quote_both
 
-# Reserved block for seeded passengers. Drivers use +2376000009xx; keeping the
-# two apart is what lets either be reseeded without disturbing the other.
-SEED_PREFIX = "+2376000008"
+# Reserved block for seeded passengers, inside the range the auth service
+# accepts so these accounts can actually be logged into. Drivers take 9xxx in
+# the same range; keeping the two apart lets either be reseeded without
+# disturbing the other.
+SEED_PREFIX = "+237600000008"
 
 PASSENGERS = [
     ("Amina", "fr"),
@@ -79,12 +95,17 @@ async def seed(passenger_count: int, ride_count: int) -> tuple[int, int]:
     now = datetime.now(UTC)
 
     async with sessionmaker() as session:
-        removed = await session.execute(
-            text("DELETE FROM users WHERE phone_e164 LIKE :prefix || '%'"),
-            {"prefix": SEED_PREFIX},
-        )
-        print(f"removed {removed.rowcount} previously seeded passengers")
-
+        # Upsert rather than delete-and-recreate.
+        #
+        # The first version cleared its own rows first, which is the ordinary
+        # way to make a seeder idempotent and is wrong here. `rides.passenger_id`
+        # is ON DELETE RESTRICT, deliberately: a ride is a financial and legal
+        # record, so the database refuses to let the person on it be erased.
+        # Deleting the rides instead is worse, because `ride_events` is
+        # append-only and a cascade trips its trigger.
+        #
+        # So the seeder converges instead of resetting. The database was right
+        # and the seeder was wrong; I7 is not something to work around.
         passenger_ids: list[uuid.UUID] = []
         for i in range(passenger_count):
             name, locale = PASSENGERS[i % len(PASSENGERS)]
@@ -93,6 +114,9 @@ async def seed(passenger_count: int, ride_count: int) -> tuple[int, int]:
                     "INSERT INTO users "
                     "(phone_e164, display_name, role, status, locale) "
                     "VALUES (:phone, :name, 'passenger', 'active', :locale) "
+                    "ON CONFLICT (phone_e164) DO UPDATE SET "
+                    "  display_name = EXCLUDED.display_name, "
+                    "  locale = EXCLUDED.locale "
                     "RETURNING id"
                 ),
                 {
@@ -116,7 +140,7 @@ async def seed(passenger_count: int, ride_count: int) -> tuple[int, int]:
                     "JOIN vehicles v ON v.driver_id = d.id "
                     "WHERE u.phone_e164 LIKE :prefix || '%'"
                 ),
-                {"prefix": "+2376000009"},
+                {"prefix": "+237600000009"},
             )
         ).all()
 
@@ -126,8 +150,56 @@ async def seed(passenger_count: int, ride_count: int) -> tuple[int, int]:
                 "driver attached. Run scripts/seed_drivers.py first."
             )
 
+        # Reattach any seeded ride whose driver went missing.
+        #
+        # Earlier versions of the driver seeder deleted and recreated the
+        # fleet. `rides.driver_id` is ON DELETE SET NULL, so that succeeded
+        # quietly and left every historical ride pointing at nobody. The
+        # seeder no longer does this, but a database that has already been
+        # through it needs repairing, and a history screen listing twenty
+        # trips that nobody drove is worse than an empty one.
+        if fleet:
+            orphaned = await session.execute(
+                text(
+                    "UPDATE rides SET "
+                    "  driver_id = :driver_id, vehicle_id = :vehicle_id "
+                    "WHERE driver_id IS NULL "
+                    "  AND status = 'completed' "
+                    "  AND passenger_id IN ("
+                    "    SELECT id FROM users WHERE phone_e164 LIKE :prefix || '%')"
+                ),
+                {
+                    "driver_id": fleet[0].driver_id,
+                    "vehicle_id": fleet[0].vehicle_id,
+                    "prefix": SEED_PREFIX,
+                },
+            )
+            if orphaned.rowcount:
+                print(
+                    f"reattached {orphaned.rowcount} historical rides that had "
+                    f"lost their driver"
+                )
+
+        # Only make up the difference. Running this twice must leave the same
+        # system, and with no delete the only way to do that is to count first.
+        already = await session.scalar(
+            text(
+                "SELECT count(*) FROM rides r "
+                "JOIN users u ON u.id = r.passenger_id "
+                "WHERE u.phone_e164 LIKE :prefix || '%'"
+            ),
+            {"prefix": SEED_PREFIX},
+        )
+        already = int(already or 0)
+        if already >= ride_count:
+            print(f"{already} seeded rides already present, nothing to add")
+            await session.commit()
+            return len(passenger_ids), 0
+
+        print(f"{already} seeded rides present, adding {ride_count - already}")
+
         created = 0
-        for i in range(ride_count):
+        for i in range(already, ride_count):
             p_label, p_lat, p_lng, d_label, d_lat, d_lng = TRIPS[i % len(TRIPS)]
             passenger_id = passenger_ids[i % len(passenger_ids)]
 

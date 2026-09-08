@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { useNotifications } from '../../../app/NotificationContext';
+import { useNotifications } from '../context/NotificationContext';
 
 export default function NotificationBell() {
   const { unreadCount } = useNotifications();

@@ -35,6 +35,11 @@ ISSUER = "vora"
 AUDIENCE = "vora-app"
 
 
+# Tolerance on the time claims, for clock skew between machines. See the note
+# in decode_access_token. Conventional value; small against a 900-second token.
+CLOCK_SKEW_LEEWAY_S = 30
+
+
 def create_access_token(
     *, user_id: uuid.UUID, role: str, expires_in_s: int | None = None
 ) -> tuple[str, int]:
@@ -72,6 +77,23 @@ def decode_access_token(token: str) -> dict[str, Any]:
             algorithms=[ALGORITHM],
             issuer=ISSUER,
             audience=AUDIENCE,
+            # RFC 7519 allows a small leeway on the time claims for clock skew,
+            # and this is why it exists. Two API instances behind a load
+            # balancer will not agree on the second, so without leeway a token
+            # minted by one can be rejected as "not yet valid" by the other for
+            # as long as they disagree. The failure is intermittent, affects
+            # tokens that were working moments earlier, and reports as
+            # INVALID_TOKEN, which sends you looking at the signature.
+            #
+            # Found the hard way: the development host's clock was oscillating
+            # by 57 seconds, and live tokens kept becoming immature under it.
+            # Leeway is the right fix for ordinary skew between machines. It is
+            # not a fix for a broken clock, and it is not treated as one.
+            #
+            # Thirty seconds is the conventional value and is deliberately far
+            # smaller than the fifteen-minute token lifetime, so it widens the
+            # window an expired token stays usable by 3 percent.
+            leeway=CLOCK_SKEW_LEEWAY_S,
             options={"require": ["exp", "iat", "nbf", "sub", "iss", "aud"]},
         )
     except jwt.ExpiredSignatureError as exc:

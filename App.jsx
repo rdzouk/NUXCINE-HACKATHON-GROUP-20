@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { MockAuthProvider } from './app/MockAuthContext';
-import { NotificationProvider } from './app/NotificationContext';
-import DevIndex from './app/DevIndex';
+import { MockAuthProvider } from './features/shared/context/MockAuthContext';
+import { NotificationProvider } from './features/shared/context/NotificationContext';
+import DevIndex from './features/shared/pages/DevIndex';
 
 import SplashPage from './features/auth/pages/SplashPage';
 import LoginPage from './features/auth/pages/LoginPage';

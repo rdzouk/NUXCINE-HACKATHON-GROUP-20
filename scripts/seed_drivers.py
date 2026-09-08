@@ -4,8 +4,15 @@
     python scripts/seed_drivers.py            # 10 drivers
     python scripts/seed_drivers.py --count 12
 
-Idempotent: reruns replace the seeded fleet and leave real accounts alone,
-which is what the `+2376000009xx` reservation below is for.
+Idempotent by upsert, not by replacement. Reruns update the seeded fleet in
+place and leave real accounts alone, which is what the `+2376000009xx`
+reservation below is for.
+
+It deliberately does not delete. `rides.driver_id` is ON DELETE SET NULL, so
+clearing the fleet succeeds quietly and detaches the driver from every
+historical ride, leaving a history screen full of trips nobody drove. That is
+the same mistake the passenger seeder makes loudly, and the quiet version is
+the more dangerous one.
 
 **The capability spread is the point, not decoration.** Phase 6 matches a
 passenger's vehicle requirements against these flags, and a fleet where every
@@ -28,9 +35,15 @@ from sqlalchemy import text
 
 from app.db import dispose_engine, get_sessionmaker
 
-# Reserved block for seeded drivers, so a rerun can clear exactly these and
-# nothing else. Real test numbers live below +23760000009xx.
-SEED_PREFIX = "+2376000009"
+# Reserved block for seeded drivers, so a rerun touches exactly these and
+# nothing else.
+#
+# It has to sit inside the range the auth service accepts, or the whole fleet
+# is unreachable: a seeded driver who cannot request an OTP cannot be logged
+# into, and the driver half of the app cannot be demonstrated at all. Test
+# numbers are TEST_NUMBER_PREFIX (+23760000000) plus one to four digits, so
+# these end up as +237600000009000 upward, with 9xxx marking them as drivers.
+SEED_PREFIX = "+237600000009"
 
 # Real places, so a seeded fleet looks plausible on a map rather than a grid of
 # points in a field. Coordinates are the gazetteer's own.
@@ -76,13 +89,11 @@ async def seed(count: int) -> int:
     rng = random.Random(20260907)  # noqa: S311 - fixture data, not security
 
     async with sessionmaker() as session:
-        removed = await session.execute(
-            text(
-                "DELETE FROM users WHERE phone_e164 LIKE :prefix || '%'"
-            ),
-            {"prefix": SEED_PREFIX},
-        )
-        print(f"removed {removed.rowcount} previously seeded drivers")
+        # Upsert, never delete. `rides.driver_id` is ON DELETE SET NULL, so
+        # clearing the fleet does not fail loudly the way clearing passengers
+        # does. It quietly detaches the driver from every historical ride, and
+        # the history screen then shows trips that nobody drove. A silent
+        # version of the same mistake is worse than the one that crashes.
 
         created = 0
         for i in range(count):
@@ -97,7 +108,11 @@ async def seed(count: int) -> int:
             user_id = await session.scalar(
                 text(
                     "INSERT INTO users (phone_e164, display_name, role, status, locale) "
-                    "VALUES (:phone, :name, 'driver', 'active', 'fr') RETURNING id"
+                    "VALUES (:phone, :name, 'driver', 'active', 'fr') "
+                    "ON CONFLICT (phone_e164) DO UPDATE SET "
+                    "  display_name = EXCLUDED.display_name, role = 'driver', "
+                    "  status = 'active' "
+                    "RETURNING id"
                 ),
                 {"phone": phone, "name": name},
             )
@@ -108,6 +123,9 @@ async def seed(count: int) -> int:
                     "(user_id, kyc_status, kyc_reviewed_at, is_online, seats_free, "
                     " rating_avg) "
                     "VALUES (:user_id, 'verified', now(), true, :seats, :rating) "
+                    "ON CONFLICT (user_id) DO UPDATE SET "
+                    "  kyc_status = 'verified', is_online = true, "
+                    "  seats_free = EXCLUDED.seats_free "
                     "RETURNING id"
                 ),
                 {
@@ -123,8 +141,10 @@ async def seed(count: int) -> int:
                     "(driver_id, plate, make, model, color, seats, has_ramp, "
                     " has_boot_space, front_seat_available, driver_assists, "
                     " accepts_guide_animal) "
-                    "VALUES (:driver_id, :plate, :make, :model, :color, :seats, "
-                    " :ramp, :boot, :front, :assists, :animal)"
+                    "SELECT :driver_id, :plate, :make, :model, :color, :seats, "
+                    " :ramp, :boot, :front, :assists, :animal "
+                    "WHERE NOT EXISTS ("
+                    "  SELECT 1 FROM vehicles WHERE driver_id = :driver_id)"
                 ),
                 {
                     "driver_id": driver_id,
@@ -147,7 +167,10 @@ async def seed(count: int) -> int:
                 text(
                     "INSERT INTO driver_presence (driver_id, geom, heading, recorded_at) "
                     "VALUES (:driver_id, "
-                    "        ST_MakePoint(:lng, :lat)::geography, :heading, now())"
+                    "        ST_MakePoint(:lng, :lat)::geography, :heading, now()) "
+                    "ON CONFLICT (driver_id) DO UPDATE SET "
+                    "  geom = EXCLUDED.geom, heading = EXCLUDED.heading, "
+                    "  recorded_at = EXCLUDED.recorded_at"
                 ),
                 {
                     "driver_id": driver_id,

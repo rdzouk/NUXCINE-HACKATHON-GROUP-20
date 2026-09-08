@@ -91,6 +91,11 @@ def test_no_undeclared_routes(app):
         expected |= {
             ("POST", f"{API}/dev/simulate-driver"),
             ("GET", f"{API}/dev/realtime-stats"),
+            # Reads back the last OTP the console sender delivered, so a demo
+            # does not stop while somebody greps the container logs. On the dev
+            # router for the same reason as the simulator: the path does not
+            # exist unless DEBUG is on outside production.
+            ("GET", f"{API}/dev/otp/{{phone}}"),
         }
 
     extra = _http_routes(app) - expected

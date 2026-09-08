@@ -95,9 +95,18 @@ MAX_LEGS = 3
 STATE_OFFERED = "offered"
 STATE_CONFIRMED = "confirmed"
 
-# How long the driver has to answer a corridor join. Shorter than a normal
-# offer: they are already driving, and the joiner is waiting at the kerb.
-JOIN_OFFER_TTL_S = 20
+# How long the driver has to answer a corridor join.
+#
+# Longer than an ordinary offer, not shorter. The first version of this was 20
+# seconds against the 25 of a normal offer, on the reasoning that the joiner is
+# waiting at the kerb. That had it backwards: a driver being asked to take a
+# corridor join is *already carrying a passenger and driving*, so they have
+# less attention to spare than one parked at a stand, and they need more time
+# to glance at a phone and decide, not less.
+#
+# An offer that lapses before it can be answered is indistinguishable from one
+# that was never sent, both to the driver and to the joiner left waiting.
+JOIN_OFFER_TTL_S = 45
 
 # Statuses in which a corridor ride can still take somebody else.
 JOINABLE = (

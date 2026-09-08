@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { clearSession, getAccessToken } from '../../auth/services/session';
 import { getRide } from '../services/ridesApi';
 import { getActiveRide, setActiveRide } from '../services/rideState';
+import { wsBaseUrl } from '../../shared/services/wsUrl';
 
 export function usePassengerRideSocket(rideId) {
   const [ride, setRide] = useState(() => getActiveRide());
@@ -47,7 +48,7 @@ export function usePassengerRideSocket(rideId) {
       };
     }
 
-    const ws = new WebSocket(`${import.meta.env.VITE_WS_BASE_URL}/ws/passenger`);
+    const ws = new WebSocket(`${wsBaseUrl()}/ws/passenger`);
     wsRef.current = ws;
 
     ws.onopen = () => {

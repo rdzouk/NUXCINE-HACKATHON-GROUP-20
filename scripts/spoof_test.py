@@ -159,7 +159,9 @@ def make_driver(user_id: str, lat: float, lng: float) -> str:
     )
     psql(
         f"INSERT INTO driver_presence (driver_id, geom, recorded_at) "
-        f"VALUES ('{uid(driver_id)}', ST_MakePoint({lng}, {lat})::geography, now())"
+        f"VALUES ('{uid(driver_id)}', ST_MakePoint({lng}, {lat})::geography, now()) "
+        f"ON CONFLICT (driver_id) DO UPDATE SET geom = EXCLUDED.geom, "
+        f"recorded_at = EXCLUDED.recorded_at"
     )
     return driver_id
 

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { requestOtp, verifyOtp } from '../services/authApi';
+import { peekOtp, requestOtp, verifyOtp } from '../services/authApi';
 import { getAccessToken, getRouteForRole, getStoredUser } from '../services/session';
 
 function sanitizePhone(value) {
@@ -22,6 +22,7 @@ export default function SignupPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [noticeMessage, setNoticeMessage] = useState('');
+  const [devCode, setDevCode] = useState('');
   const navigate = useNavigate();
 
   const expiresLabel = useMemo(() => {
@@ -52,6 +53,10 @@ export default function SignupPage() {
       setResendAfterSeconds(response.resend_after_s);
       setCode('');
       setNoticeMessage('Verify this code to create your account and open a session.');
+
+      // No SMS gateway is wired, so in development the server can hand
+      // the code straight back. Returns null on a real deployment.
+      setDevCode((await peekOtp(phone.trim())) ?? '');
     } catch (error) {
       setNoticeMessage('');
       setErrorMessage(error.message);
@@ -133,6 +138,14 @@ export default function SignupPage() {
         )}
       </form>
       {noticeMessage ? <p>{noticeMessage}</p> : null}
+      {devCode ? (
+        <p className="dev-otp">
+          <strong>Development code: {devCode}</strong>
+          <br />
+          No SMS gateway is wired, so the server is showing you the code it
+          would have sent. This does not exist outside development.
+        </p>
+      ) : null}
       {errorMessage ? <p>{errorMessage}</p> : null}
       <p>Already have an account? <Link to="/login">Log in</Link></p>
     </main>

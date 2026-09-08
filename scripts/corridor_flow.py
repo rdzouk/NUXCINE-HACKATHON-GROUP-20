@@ -172,7 +172,9 @@ def make_driver(
     )
     psql(
         f"INSERT INTO driver_presence (driver_id, geom, recorded_at) "
-        f"VALUES ('{uid(driver_id)}', ST_MakePoint({lng}, {lat})::geography, now())"
+        f"VALUES ('{uid(driver_id)}', ST_MakePoint({lng}, {lat})::geography, now()) "
+        f"ON CONFLICT (driver_id) DO UPDATE SET geom = EXCLUDED.geom, "
+        f"recorded_at = EXCLUDED.recorded_at"
     )
     return driver_id
 
@@ -274,6 +276,25 @@ def main() -> int:
 
     # Exactly at the pickup, so this driver leads the nearest candidates.
     make_driver(d_user, WARDA["lat"], WARDA["lng"], seats=4)
+
+    # Isolate the corridor, the way race_test isolates its race.
+    #
+    # A corridor left live by an earlier run was driving this same route, so
+    # its geometry contains the joiners' endpoints too. B would then be matched
+    # onto that stale parent instead of onto A, and the assertions here would
+    # report "no leg was created" while the corridor logic had in fact worked
+    # perfectly, on the wrong ride. Retiring them first makes A's corridor the
+    # only one this test can match against.
+    stale = psql(
+        "UPDATE rides SET status = 'expired', ended_at = now() "
+        "WHERE mode = 'corridor' "
+        "AND status IN ('requested','matching','accepted','arriving',"
+        "'arrived','in_progress') "
+        "RETURNING id"
+    )
+    if stale:
+        print(f"{DIM}  retired corridor rides left live by an earlier run{RESET}")
+
     check("three passengers, one four-seat vehicle, one bystander", True)
     print()
 
