@@ -50,10 +50,28 @@ Ce que le contexte impose, et ce que nous en avons fait:
 | L'adressage par rue est quasi inexistant | Recherche par reperes, pas par adresse |
 | Le partage de taxi est la norme, pas l'exception | Le corridor est un mode de premiere classe |
 | Le paiement se fait en especes | Aucun mouvement d'argent, un registre de dettes |
+| On paie avec les pieces qu'on a | Tout tarif est arrondi a 50 XAF |
 | La connexion coupe | Degradation annoncee, jamais silencieuse |
 | Les telephones sont modestes | Application web installable, pas un binaire de 40 Mo |
 | La Loi 2024/017 interdit le traitement des donnees de sante | Aucune donnee de sante, jamais |
 | Un passager monte dans la voiture d'un inconnu | Code PIN a la prise en charge, partage de course, SOS |
+
+Deux de ces lignes meritent une phrase de plus, parce qu'elles ne se voient pas
+a l'ecran.
+
+**L'arrondi a 50 XAF n'est pas cosmetique.** Un tarif de 1 237 XAF ne se paie
+pas en especes sans que le chauffeur cherche la monnaie. Le prix affiche doit
+etre un prix qui peut reellement changer de main. L'arrondi est fait au demi
+superieur et non par la fonction `round` de Python, qui envoie les moities vers
+le multiple pair: 25 XAF descendrait a zero pendant que 75 monterait a 100.
+Traiter deux moities identiques differemment est exactement ce qu'un chauffeur
+remarque, et apres quoi il cesse de faire confiance a l'application.
+
+**"Degradation annoncee" veut dire que la reponse le dit elle-meme.** Quand le
+moteur d'itineraire ne repond pas, l'estimation bascule sur un calcul a vol
+d'oiseau et le champ `routing_source` passe de `osrm` a `haversine_fallback`.
+Le client peut donc prevenir le passager que l'estimation est approximative.
+Une estimation degradee qui se presente comme exacte serait pire qu'une erreur.
 
 ## 3. Notre solution
 
@@ -150,6 +168,17 @@ Le critere n'est pas la proximite mais la contenance: les deux points doivent
 se trouver sur la ligne deja parcourue, dans le sens de la marche. Un candidat
 a 278 m de la ligne est refuse a 15,3 % de detour pour un plafond de 8 %.
 **46 verifications passent.**
+
+**Le chauffeur est consulte, jamais force.** Aucun passager n'est ajoute
+automatiquement a une course en train de se faire. C'est le chauffeur qui a
+quelqu'un dans sa voiture et qui doit gerer la rencontre, donc c'est lui qui
+decide, et un refus ne lui coute rien. Une plateforme qui impose les
+ramassages perd ses chauffeurs.
+
+**La place est bloquee a la demande, pas a la reponse.** Tant que le chauffeur
+n'a pas repondu, la place compte deja comme vendue. Sans cela, deux passagers
+peuvent se voir proposer la meme derniere place pendant les quelques secondes
+de reflexion, et l'un des deux ne l'apprend qu'au bord de la route.
 
 Regle de securite: deux reservations au maximum, et le second passager voyage
 a l'avant, seul. Le premier passager peut monter avec ses proches; un inconnu
@@ -256,6 +285,14 @@ sur le schema, pas des preferences produit.
   `./scripts/security_audit.sh`
 - Aucune cle cote client. Les identifiants de carte, de routage et de
   messagerie restent cote serveur
+
+**Le journal des courses est en ajout seul, et c'est une contrainte de base de
+donnees.** Pas une convention, pas un simple retrait de droits: l'application
+se connecte en proprietaire de la table et un proprietaire contourne les
+droits. Le declencheur, lui, se declenche pour tout le monde. `ride_events` est
+la couche de preuve sur laquelle reposent une contestation de tarif, un
+signalement de securite et la notification de violation exigee par la Loi
+2024/017. Un journal d'audit modifiable n'est pas un journal d'audit.
 
 ## 7. Architecture
 
