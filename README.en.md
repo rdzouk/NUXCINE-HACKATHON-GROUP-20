@@ -64,6 +64,23 @@ the product is built around.
 We did not add ride-sharing to a taxi app. We digitised the shared-corridor
 model that already exists here, and added exclusive hire on top of it.
 
+**Next, and not built: the pre-ordered ride with a deposit.** A passenger books
+the day before, names a pickup point and a time, and chooses whether to share.
+A deposit is held by mobile money at booking, paid to nobody. The driver
+arrives and a clock starts, from arrival as the server's own GPS trace observes
+it rather than from a button the driver presses. If the passenger comes, the
+deposit counts toward the fare and they settle the rest in cash. If they do not
+come inside the window, the driver takes the deposit and leaves, with nothing
+to claim and no debt to chase. On a shared pre-ordered ride every joiner posts
+their own deposit and gets their own pickup point and their own waiting window.
+
+The no-show is the unsolved problem of a cash market. Today we answer it after
+the fact, with a debt that blocks the next booking. A deposit answers it
+before. It is unbuilt because it is the first feature that needs money to
+actually move, and holding a customer's funds is a regulated activity that
+belongs to a licensed mobile money provider rather than to us. The reasoning
+and the hard questions are in [docs/PITCH.md](docs/PITCH.md).
+
 ## Security and privacy posture
 
 These are constraints on the schema, not product preferences. Cameroon's Law

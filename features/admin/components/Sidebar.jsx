@@ -1,5 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { getLocale } from '../../shared/services/locale';
+import { t } from '../../shared/services/strings';
+import { clearSession } from '../../auth/services/session';
 
 /**
  * Admin navigation, with the unbuilt screens marked as unbuilt.
@@ -50,6 +52,20 @@ export default function Sidebar() {
           ? 'Marked items are not built. Nothing on this dashboard is invented.'
           : "Les elements marques ne sont pas construits. Rien sur ce tableau de bord n'est invente."}
       </p>
+
+      {/* An admin session is the highest-value one in the system and had no
+          way to end itself. Leaving it signed in on a shared machine is the
+          whole reason this belongs here. */}
+      <button
+        className="secondary-button"
+        type="button"
+        onClick={() => {
+          clearSession();
+          window.location.assign('/login');
+        }}
+      >
+        {t('common.logout')}
+      </button>
     </aside>
   );
 }

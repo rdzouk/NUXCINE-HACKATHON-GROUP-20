@@ -77,6 +77,7 @@ qui bloque.
 | Point | Etat | Ou |
 |---|---|---|
 | Demonstration preparee | oui | `./scripts/demo.sh`, chronometree |
+| Argumentaire et questions difficiles | oui | `docs/PITCH.md` |
 | Innovation expliquee | oui | `README.md` §5 |
 | Architecture expliquee | oui | `README.md` §7, `ARCHITECTURE.md` |
 | Securite expliquee | oui | `README.md` §6, `THREAT_MODEL.md` |

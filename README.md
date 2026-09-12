@@ -238,6 +238,47 @@ solde impaye bloque la reservation suivante. C'est ce qui rend des frais reels
 sur un marche ou tout se paie en especes et ou il n'existe aucun rail de
 paiement. **20 cellules de politique sur 20 verifiees.**
 
+### Ce qui vient ensuite: la course programmee avec acompte
+
+Non construite. Elle est decrite ici parce que c'est la suite logique des deux
+paris ci-dessus, et parce qu'elle repond au probleme que le registre de dettes
+ne resout qu'a moitie.
+
+**Le principe.** Le passager reserve la veille, choisit une heure et un point
+de rendez-vous precis: sa porte, ou un carrefour. Il decide s'il accepte de
+partager ou non, exactement comme aujourd'hui. A la reservation, un **acompte
+est bloque** par mobile money. Il n'est ni verse au chauffeur ni encaisse par
+la plateforme: il est retenu.
+
+Le jour venu, le chauffeur se presente au point convenu et un compteur demarre.
+Il demarre a l'arrivee constatee par le releve GPS du serveur, pas au moment ou
+le chauffeur declare etre arrive.
+
+- **Le passager se presente:** l'acompte est deduit du tarif. Il ne paie que le
+  solde, en especes, a la fin de la course.
+- **Le passager ne se presente pas dans le delai:** le chauffeur encaisse
+  l'acompte et repart. Rien a reclamer, aucune dette a poursuivre.
+
+**En partage, la meme regle pour tout le monde.** Chaque passager qui accepte
+une course programmee partagee depose son propre acompte, obtient son propre
+point de rendez-vous et son propre delai d'attente. Le chauffeur parcourt
+l'itineraire et attend le temps convenu a chaque point.
+
+**Pourquoi cela compte.** Le passager fantome est le probleme non resolu d'un
+marche ou tout se paie en especes. Aujourd'hui nous y repondons apres coup,
+avec une dette qui bloque la reservation suivante. L'acompte y repond avant.
+Et un chauffeur qui connait sa tournee de 6 h la veille ne tourne pas a vide
+pour la trouver: le corridor cesse d'etre une rencontre heureuse et devient
+une tournee planifiee.
+
+**Pourquoi ce n'est pas livre.** C'est la premiere fonctionnalite qui exige que
+de l'argent bouge reellement. Conserver les fonds d'un client est une activite
+reglementee; la retenue doit donc etre operee par un prestataire mobile money
+agree, pas par nous. Ce choix se decide avec un partenaire, pas en 48 heures.
+
+Le raisonnement complet, les questions difficiles et les reponses sont dans
+[docs/PITCH.md](docs/PITCH.md).
+
 ## 6. Securite
 
 Detail complet dans [THREAT_MODEL.md](THREAT_MODEL.md). Ce sont des contraintes
@@ -458,7 +499,7 @@ features/         le client React: passenger, driver, admin, map, shared
 public/           manifeste PWA, service worker, icones
 scripts/          semeurs, harnais d'acceptation, audit de securite, demarrage
 bruno/            la demonstration sous forme de collection d'API executable
-docs/             decisions de contrat et notes de phase
+docs/             argumentaire, decisions de contrat et notes de phase
 design-prototype/ la maquette de l'equipe design. Reference visuelle, non executee
 ui/vora/          la premiere maquette HTML/CSS. Historique, non executee
 backend/          une proposition de passerelle SMS, marquee BROUILLON, non integree
